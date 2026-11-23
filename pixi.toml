@@ -63,13 +63,15 @@ BOTOP_HW = "OFF"
 XDG_SESSION_TYPE = "x11"
 
 [tasks]
-deps = { cmd = "bash scripts/build_deps.sh", description = "Build fcl and PhysX from source into the pixi env (not usable from conda-forge)" }
+deps = { cmd = "bash scripts/build_deps.sh", description = "Build fcl, qhull and PhysX from source into the pixi env (not usable from conda-forge)" }
 
 configure = { cmd = "cmake -S . -B build/$PIXI_ENVIRONMENT_NAME -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_LIBFRANKA=$BOTOP_HW -DUSE_REALSENSE=$BOTOP_HW", depends-on = ["deps"], description = "Configure CMake into build/<env>" }
 
-build = { cmd = "cmake --build build/$PIXI_ENVIRONMENT_NAME", depends-on = ["configure"], description = "Build librai, bot, kinEdit, meshTool and the python module" }
+build = { cmd = "cmake --build build/$PIXI_ENVIRONMENT_NAME", depends-on = ["configure"], description = "Build librai, bot, kinEdit, meshTool and the python module into build/<env> (no install)" }
 
-install = { cmd = "cmake --install build/$PIXI_ENVIRONMENT_NAME", depends-on = ["build"], description = "Install into the pixi env ($CONDA_PREFIX) only" }
+install = { cmd = "cmake --install build/$PIXI_ENVIRONMENT_NAME", depends-on = ["build"], description = "Build and install into the current pixi env ($CONDA_PREFIX) only" }
+
+install-all = { cmd = "pixi run -e default install && pixi run -e hw install", description = "Build and install both the simulation (default) and hardware (hw) environments" }
 
 stubs = { cmd = "cmake --build build/$PIXI_ENVIRONMENT_NAME --target docstrings", depends-on = ["build"] }
 

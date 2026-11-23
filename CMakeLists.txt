@@ -18,10 +18,17 @@ if(DEFINED ENV{CONDA_PREFIX})
   endif()
 endif()
 
-## first time call: generate unity sources
-if(NOT DEFINED CMAKE_CACHE_MAJOR_VERSION)
-  execute_process(COMMAND make -j1 -C ${CMAKE_CURRENT_SOURCE_DIR}/rai unityAll)
-endif()
+## generate rai unity sources (same content as 'make -C rai unityAll'); the file is only
+## rewritten when its content changes, so build/default and build/hw do not trigger rebuilds of each other
+set(RAI_UNITY_MODULES Core Optim Geo Algo Search PathAlgos Gui Kin KOMO LGP Logic Control DataGen Perception ry)
+foreach(m ${RAI_UNITY_MODULES})
+  execute_process(
+    COMMAND sh -c "find . -maxdepth 1 -name '*.h' -printf '#include \"%f\"\\n' | sort; find . -maxdepth 1 -name '*.cpp' -printf '#include \"%f\"\\n' | sort"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rai/src/${m}
+    OUTPUT_VARIABLE unity_content
+    COMMAND_ERROR_IS_FATAL ANY)
+  file(CONFIGURE OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/rai/src/${m}/unity.cxx CONTENT "${unity_content}" @ONLY)
+endforeach()
 
 ## variable default values
 set(CMAKE_INSTALL_MESSAGE LAZY)
@@ -121,10 +128,11 @@ add_library(rai SHARED
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(GLUT REQUIRED)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED CONFIG)
+find_package(assimp REQUIRED CONFIG)  # not via pkg-config: assimp.pc has a broken Libs.private
 pkg_check_modules(DEPS REQUIRED IMPORTED_TARGET
   glfw3 glew glu gl x11 xrandr xxf86vm xi
-  yaml-0.1 libpng assimp ccd portaudio-2.0 hidapi-hidraw)
+  yaml-0.1 libpng ccd portaudio-2.0 hidapi-hidraw)
 find_library(FCL_LIB NAMES fcl REQUIRED)  # not via pkg-config: fcl.pc forces -std=c++11
 
 find_library(ANN_LIB NAMES ANN ann REQUIRED)
@@ -136,6 +144,7 @@ target_link_libraries(rai PUBLIC
   Eigen3::Eigen
   ${FCL_LIB}
   PkgConfig::DEPS
+  assimp::assimp
   GLUT::GLUT
   Boost::headers
   ${ANN_LIB} ${QHULL_LIB} ${LAPACK_LIB} ${BLAS_LIB}
@@ -198,6 +207,7 @@ if(USE_PYBIND)
   )
   target_compile_definitions(_robotic PUBLIC RAI_PYBIND)
   target_link_libraries(_robotic PRIVATE rai)
+  target_link_options(_robotic PRIVATE -flto=auto)  # parallel LTO link (pybind11 adds plain -flto)
 
   set(PY_LIB_SITE "${Python_SITEARCH}")
   message(STATUS "[botop] python ${Python_VERSION}, installing package 'robotic' in ${PY_LIB_SITE}")
