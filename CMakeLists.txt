@@ -37,7 +37,7 @@ option(USE_REALSENSE "link to realsense2 driver library" ON)
 option(USE_LIBFRANKA "link to libfranka" ON)
 option(USE_H5 "link to h5 library" ON)
 option(USE_FREETYPE "link to freetype2 library" ON)
-option(BUILD_TESTS "build the test/*/main.cpp executables" OFF)
+option(BUILD_TESTS "build the test/examples/*/main.cpp executables" OFF)
 
 ## compile options
 add_compile_options(
@@ -228,7 +228,7 @@ add_executable(bot bin/bot/main.cpp)
 target_link_libraries(bot rai)
 
 if(BUILD_TESTS)
-  file(GLOB tests test/*/main.cpp)
+  file(GLOB tests test/examples/*/main.cpp)
   foreach(file ${tests})
     get_filename_component(path ${file} DIRECTORY)
     get_filename_component(name ${path} NAME)

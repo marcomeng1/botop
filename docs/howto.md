@@ -2,6 +2,8 @@
 
 ##  Examples
 
+* All examples/tests referenced below live in `test/examples/`.
+
 * Note: with the current rai, the tests 02-multi-camera, 04, 05, 06, 07, 08, 09, 11, 13, 14, 20
   and 21 no longer compile (old rai API, e.g. `getLimits`, `JT_rigid`) and need updating. Build
   them with `-DBUILD_TESTS=ON` to check.
@@ -42,7 +44,7 @@
 
 * Try the tests 05, 06, 08
 
-* Try calibrating the station with test/11... (read below first)
+* Try calibrating the station with test/examples/11... (read below first)
 
 
 ## Commanding motion

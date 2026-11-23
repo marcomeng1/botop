@@ -3,7 +3,7 @@ BASE2 = .
 
 DEPEND = KOMO Core Algo Geo Kin Gui Optim Perception
 
-test_paths = $(shell find test -mindepth 2 -maxdepth 2 -name 'Makefile' -printf "%h ")
+test_paths = $(shell find test/examples -mindepth 2 -maxdepth 2 -name 'Makefile' -printf "%h ")
 
 src_paths =  $(shell find src -mindepth 1 -maxdepth 1 -type d -not -name 'retired' -printf "%f ")
 
@@ -22,7 +22,7 @@ tests: $(test_paths:%=inPath_make/%)
 
 runTests: tests
 	@rm -f z.test-report
-	@find test -mindepth 1 -maxdepth 1 -type d \
+	@find test/examples -mindepth 1 -maxdepth 1 -type d \
 		-exec rai/_make/run-path.sh {} \;
 
 include $(BASE)/_make/generic.mk

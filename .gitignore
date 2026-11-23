@@ -145,4 +145,4 @@ srv_gen
 *Result.msg
 
 # test executables (BUILD_TESTS)
-test/*/test_*
+test/examples/*/test_*

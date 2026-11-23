@@ -64,7 +64,7 @@ Environments and tasks (see `pixi.toml`):
 | `pixi run stubs` | generate `_robotic.pyi` stubs |
 | `pixi run clean` | remove `build/` |
 
-C++ tests are not built by default; configure with `-DBUILD_TESTS=ON` to build `test/*/main.cpp`.
+The C++ examples in `test/examples/` are not built by default; configure with `-DBUILD_TESTS=ON` to build `test/examples/*/main.cpp`. `test/py` is the Python smoke test (`pixi run test-py`).
 Python-only packages from PyPI can be added under `[pypi-dependencies]` in `pixi.toml` (installed via uv).
 
 
