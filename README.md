@@ -23,54 +23,49 @@ We don't use ROS at all anymore.
 
 ## Installation
 
-This assumes a standard Ubuntu, tested on 18.04, 20.04, and latest docker. (When compiling in a docker, perhaps `export APTGETYES="--yes"; alias sudo=""` )
+All dependencies (compilers, C++ libraries, Python) are managed by
+[pixi](https://pixi.sh) from conda-forge, pinned in `pixi.lock`, and live
+only in `.pixi/` inside this repo. Nothing is installed into the system,
+`~/.local`, or other Python/conda environments. The only system requirement
+is a graphics driver (and an X11/XWayland display for the viewer).
 
-* The following assumes $HOME/git as your git path, and $HOME/.local to
-  install 3rd-party libs -- please stick to this (no system-wide
-  installs). The following installs basic ubuntu packages (used by external packages and botop):
+* Install pixi once (into `~/.pixi`; add `~/.pixi/bin` to your PATH):
 
-      sudo apt update
-	  sudo apt install --yes \
-        g++ clang make cmake curl git wget \
-        liblapack-dev libf2c2-dev libqhull-dev libeigen3-dev libann-dev libccd-dev \
-        libjsoncpp-dev libyaml-cpp-dev libpoco-dev libboost-system-dev portaudio19-dev libusb-1.0-0-dev libhidapi-dev \
-        libx11-dev libglu1-mesa-dev libglfw3-dev libglew-dev freeglut3-dev libpng-dev libassimp-dev
-      mkdir -p $HOME/git $HOME/.local
+      curl -fsSL https://pixi.sh/install.sh | bash
 
-* External libraries: You can skip librealsense and libfranka if you disable below. To standardize installations, I use a [basic install script](https://github.com/MarcToussaint/rai-extern/blob/main/install.sh) (have a look, if you have concerns what it does).
+* Clone and build:
 
-      export MAKEFLAGS="-j $(command nproc --ignore 2)"
-	  wget https://github.com/MarcToussaint/rai-extern/raw/main/install.sh; chmod a+x install.sh
-      ./install.sh fcl
-      ./install.sh physx
-      ./install.sh librealsense
-      ./install.sh libfranka  ## for OLD frankas instead:   ./install.sh -v 0.7.1 libfranka
-
-* You can skip this, if you disable pybind11 below.
-
-      sudo apt install --yes python3-dev python3 python3-pip
-      python3 -m pip install --user numpy pybind11 pybind11-stubgen
-	  
-	  # add the following to your .bashrc, if not done already
-      echo 'export PATH="${PATH}:$HOME/.local/bin"' >> ~/.bashrc
-      echo 'export PYTHONPATH="${PYTHONPATH}:$HOME/.local/lib"' >> ~/.bashrc
-
-* Finally, clone and compile this repo:
-
-      cd $HOME/git
-	  git clone --recurse-submodules git@github.com:MarcToussaint/botop.git
+      git clone --recurse-submodules git@github.com:MarcToussaint/botop.git
       cd botop
-      export PY_VERSION=`python3 -c "import sys; print(str(sys.version_info[0])+'.'+str(sys.version_info[1]))"`
-      cmake -DUSE_BULLET=OFF -DUSE_OPENCV=OFF -DPY_VERSION=$PY_VERSION . -B build  #options: disable USE_LIBFRANKA USE_REALSENSE USE_PYBIND USE_PHYSX
-	  make -C build/
+      pixi run install      # builds fcl/qhull/PhysX once, then botop; installs into .pixi/envs/default
 
-* Optionally install lib, headers, and binaries to ~/.local
+* Test in simulation:
 
-      make -C build/ install
+      pixi run test-py
+      pixi run bot -sim -loop
 
-* Test the things in test/
+* For the real robot (libfranka + librealsense) use the `hw` environment.
+  libfranka must match your robot's system version; pin it in `pixi.toml` if needed:
 
-      bot -sim -loop
+      pixi run -e hw install
+      pixi run -e hw bot -home
+
+* Work interactively with `pixi shell` (or `pixi shell -e hw`): `python`, `bot`,
+  `kinEdit`, `meshTool` and `import robotic` then come from this environment.
+
+Environments and tasks (see `pixi.toml`):
+
+| | |
+|---|---|
+| `default` | simulation only (no libfranka/librealsense) + jupyter |
+| `hw` | adds libfranka, librealsense, poco |
+| `pixi run deps` | source-build fcl 0.5, qhull (non-reentrant), PhysX 104.1 into the env (`scripts/build_deps.sh`) |
+| `pixi run build` / `install` | configure + build into `build/<env>` / install into the env |
+| `pixi run stubs` | generate `_robotic.pyi` stubs |
+| `pixi run clean` | remove `build/` |
+
+C++ tests are not built by default; configure with `-DBUILD_TESTS=ON` to build `test/*/main.cpp`.
+Python-only packages from PyPI can be added under `[pypi-dependencies]` in `pixi.toml` (installed via uv).
 
 
 ## Panda robot operation
@@ -103,7 +98,9 @@ You need to log out and back in (or even reboot) for this to take effect. Check 
       include $(BASE)/build/generic.mk
 
 * If you have more cpp-files, you can add `OBJS = main.o code.o etc.o`
-* Otherwise, use your own build system and just link with librai.so
+* Otherwise, use your own build system and just link with librai.so. After `pixi run install`,
+  headers are in `.pixi/envs/default/include/rai` and the library in `.pixi/envs/default/lib`;
+  build from within `pixi shell` so the same compiler and libraries are used.
 
 
 ## cmd line tool `bot`

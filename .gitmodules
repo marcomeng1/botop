@@ -1,6 +1,7 @@
 [submodule "rai"]
 	path = rai
 	url = ../rai.git
+	branch = pixi-cleanup
 [submodule "rai-robotModels"]
 	path = rai-robotModels
 	url = ../rai-robotModels.git

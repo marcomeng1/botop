@@ -2,50 +2,32 @@ name: CMake
 
 on: [push, pull_request]
 
-env:
-  BUILD_TYPE: Release
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
-    - name: install ubuntu dependencies
+    - uses: prefix-dev/setup-pixi@v0.8
+      with:
+        cache: true
+
+    - name: cache source-built deps (fcl, qhull, physx)
+      uses: actions/cache@v4
+      with:
+        path: .pixi/src
+        key: deps-${{ hashFiles('scripts/build_deps.sh') }}
+
+    - name: build
+      run: pixi run build
+
+    - name: install into pixi env
+      run: pixi run install
+
+    - name: python smoke test (simulation, headless)
       run: |
-        sudo apt-get install --yes build-essential clang cmake curl git libpoco-dev libeigen3-dev libccd-dev libboost-system-dev portaudio19-dev libglu1-mesa-dev libhidapi-dev
-        APTGETYES=1 make -C rai -j1 installUbuntuAll
-        mkdir -p $HOME/git $HOME/.local
-
-    - name: install installer
-      run: wget https://github.com/MarcToussaint/rai-extern/raw/main/install.sh; chmod a+x install.sh
-
-    - name: install PhysX
-      run: ./install.sh physx
-
-    - name: install FCL
-      run: ./install.sh fcl
-
-    - name: install libfranka
-      run: ./install.sh libfranka
-
-    - name: install python and pybind
-      run: |
-        sudo apt install --yes python3 python3-dev python3-pip
-        echo 'export PATH="${PATH}:$HOME/.local/bin"' >> ~/.bashrc   #add this to your .bashrc, if not done already
-        source ~/.bashrc
-        python3 -m pip install --user numpy jupyter nbconvert matplotlib pybind11
-
-    - name: setup build files
-      run: |
-        export PY_VERSION=`python3 -c "import sys; print(str(sys.version_info[0])+'.'+str(sys.version_info[1]))"`
-        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=$HOME/.local -DUSE_PHYSX=ON -DUSE_REALSENSE=OFF -DUSE_OPENCV=OFF -DUSE_OPENCV_LOCAL=OFF -DPY_VERSION=$PY_VERSION -DUSE_QHULL8=ON
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-    - name: install
-      run: cmake --install ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        sudo apt-get install --yes xvfb
+        xvfb-run -a pixi run python test/py/test.py

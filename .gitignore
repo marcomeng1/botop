@@ -43,7 +43,11 @@ tags
 # PYTHON
 *.pyc
 _*.py
+!python/robotic/__init__.py
 .ipynb_checkpoints
+
+# PIXI
+.pixi/
 
 # EXECUTION
 core
@@ -139,3 +143,6 @@ srv_gen
 *Feedback.msg
 *Goal.msg
 *Result.msg
+
+# test executables (BUILD_TESTS)
+test/*/test_*

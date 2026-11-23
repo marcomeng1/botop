@@ -1,0 +1,97 @@
+[workspace]
+name = "botop"
+description = "LIS robot operation (BotOp) with the rai library"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+requires-pixi = ">=0.40"
+
+[dependencies]
+# toolchain
+cxx-compiler = "*"
+c-compiler = "*"
+clangxx = "18.*"   # PhysX 104.1 build presets require clang
+cmake = ">=3.20"
+ninja = "*"
+make = "*"
+pkg-config = "*"
+git = "*"
+
+# numerics / geometry
+eigen = "3.4.*"
+blas-devel = "*"
+liblapack = "*"
+f2c = "*"          # f2c.h types for rai's clapack.h
+glm = "*"
+qhull = "*"
+libccd-double = "*"
+ann = "*"
+assimp = "*"
+
+# gui / gl / x11
+glfw = "*"
+glew = "*"
+freeglut = "*"
+libglu = "*"
+libgl-devel = "*"
+libopengl-devel = "*"
+xorg-libx11 = "*"
+xorg-libxrandr = "*"
+xorg-libxxf86vm = "*"
+xorg-libxi = "*"
+freetype = "*"
+
+# io / misc
+yaml-cpp = "*"
+libpng = "*"
+zlib = "*"
+hdf5 = "*"
+portaudio = "*"
+libhidapi = "*"
+libusb = "*"
+libboost-devel = "<1.87"   # OptiTrack uses boost::asio::io_service, removed in 1.87
+opencv = "*"
+
+# python
+python = "3.12.*"
+numpy = "*"
+pybind11 = "2.13.*"   # 3.x rejects mismatched py::arg counts in rai/src/ry
+pybind11-stubgen = "*"
+
+[activation.env]
+BOTOP_HW = "OFF"
+# conda-forge glfw prefers Wayland, where rai's window positioning fails; use X11/XWayland
+XDG_SESSION_TYPE = "x11"
+
+[tasks]
+deps = { cmd = "bash scripts/build_deps.sh", description = "Build fcl and PhysX from source into the pixi env (not usable from conda-forge)" }
+
+configure = { cmd = "cmake -S . -B build/$PIXI_ENVIRONMENT_NAME -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_LIBFRANKA=$BOTOP_HW -DUSE_REALSENSE=$BOTOP_HW", depends-on = ["deps"], description = "Configure CMake into build/<env>" }
+
+build = { cmd = "cmake --build build/$PIXI_ENVIRONMENT_NAME", depends-on = ["configure"], description = "Build librai, bot, kinEdit, meshTool and the python module" }
+
+install = { cmd = "cmake --install build/$PIXI_ENVIRONMENT_NAME", depends-on = ["build"], description = "Install into the pixi env ($CONDA_PREFIX) only" }
+
+stubs = { cmd = "cmake --build build/$PIXI_ENVIRONMENT_NAME --target docstrings", depends-on = ["build"] }
+
+test-py = { cmd = "python test/py/test.py", depends-on = ["install"], description = "Smoke test of the robotic python module (simulation)" }
+
+clean = "rm -rf build"
+
+[feature.hw.dependencies]
+# libfranka must match the robot's system version (see libfranka compatibility table), e.g. "0.9.*"
+libfranka = "*"
+librealsense = "*"
+poco = "*"
+
+[feature.hw.activation.env]
+BOTOP_HW = "ON"
+XDG_SESSION_TYPE = "x11"
+
+[feature.dev.dependencies]
+jupyter = "*"
+nbconvert = "*"
+matplotlib = "*"
+
+[environments]
+default = { features = ["dev"], solve-group = "main" }
+hw = { features = ["hw", "dev"], solve-group = "main" }

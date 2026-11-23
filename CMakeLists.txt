@@ -1,6 +1,22 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.20)
 
-project(LISRobotOperation)
+project(LISRobotOperation LANGUAGES C CXX)
+
+## dependencies come from the pixi environment (see pixi.toml); never from ~/.local or the system
+option(BOTOP_REQUIRE_PIXI "only configure inside a pixi environment of this repo" ON)
+if(BOTOP_REQUIRE_PIXI)
+  if(NOT DEFINED ENV{CONDA_PREFIX} OR NOT "$ENV{CONDA_PREFIX}" MATCHES "/\\.pixi/envs/")
+    message(FATAL_ERROR "[botop] configure via 'pixi run build' (or inside 'pixi shell'). "
+      "Set -DBOTOP_REQUIRE_PIXI=OFF only if you know what you are doing.")
+  endif()
+endif()
+if(DEFINED ENV{CONDA_PREFIX})
+  set(ENV_PREFIX "$ENV{CONDA_PREFIX}")
+  list(PREPEND CMAKE_PREFIX_PATH "${ENV_PREFIX}")
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "${ENV_PREFIX}" CACHE PATH "install prefix" FORCE)
+  endif()
+endif()
 
 ## first time call: generate unity sources
 if(NOT DEFINED CMAKE_CACHE_MAJOR_VERSION)
@@ -10,38 +26,22 @@ endif()
 ## variable default values
 set(CMAKE_INSTALL_MESSAGE LAZY)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ version selection")
-set(PY_VERSION 3.12 CACHE STRING "python version")
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/.local" CACHE PATH "..." FORCE)
-endif()
-if(DEFINED ENV{VIRTUAL_ENV})
-  set(PY_LIB_SITE "$ENV{VIRTUAL_ENV}/lib/python${PY_VERSION}/site-packages")
-else()
-  set(PY_LIB_SITE "${CMAKE_INSTALL_PREFIX}/lib/python${PY_VERSION}/site-packages")
-endif()
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-set(CMAKE_INSTALL_RPATH "\$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
-#only for testing: python module needs to link to python later!
-#set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
+set(CMAKE_INSTALL_RPATH "\$ORIGIN;\$ORIGIN/../lib;${CMAKE_INSTALL_PREFIX}/lib")
 
 ## options
 option(USE_PYBIND "build python bindings" ON)
-option(USE_BULLET "link to bullet" OFF)
 option(USE_PHYSX "link to physx" ON)
 option(USE_OPENCV "link to opencv" ON)
-option(USE_OPENCV_sys "link to opencv" OFF)
-option(USE_OPENVR "link to openvr" OFF)
 option(USE_REALSENSE "link to realsense2 driver library" ON)
 option(USE_LIBFRANKA "link to libfranka" ON)
-option(USE_PCL "link to pcl library" OFF)
 option(USE_H5 "link to h5 library" ON)
 option(USE_FREETYPE "link to freetype2 library" ON)
-option(MODULE_Vive "compile the ViveController module" OFF)
+option(BUILD_TESTS "build the test/*/main.cpp executables" OFF)
 
 ## compile options
 add_compile_options(
   -O3 -g -Wall -Wpedantic -fPIC
-  $<$<COMPILE_LANGUAGE:CXX>:-std=c++17>
   $<$<COMPILE_LANGUAGE:CXX>:-Wno-terminate>
   $<$<COMPILE_LANGUAGE:CXX>:-Wno-array-bounds>
   )
@@ -55,34 +55,19 @@ add_definitions(
   -DRAI_GLFW -DRAI_ANN -DRAI_QHULL8 -DRAI_ASSIMP -DNO_CYCLE_DETECTION -DRAI_PNG -DRAI_PLY -DRAI_YAML
   -DRAI_GJK -DRAI_CCD -DRAI_FCL -DRAI_Lewiner -DRAI_VHACD
   -DRAI_PORTAUDIO
-  -BOOST_ERROR_CODE_HEADER_ONLY
+  -DBOOST_ERROR_CODE_HEADER_ONLY
   -DRAI_BotOp
   -DRAI_ROBOTIQ
   -DRAI_OMNIBASE
   -DRAI_OPTITRACK
 )
 
-################################################################################
-
 include_directories(
   rai/src
   src
-  $ENV{HOME}/.local/include
-  /usr/include/eigen3
   )
 
-link_directories(
-  $ENV{HOME}/.local/lib
-  $ENV{HOME}/.local/lib/opencv5/3rdparty
-  )
-
-if(USE_H5)
-  link_directories(/usr/lib/x86_64-linux-gnu/hdf5/serial)
-endif()
-
-if(USE_PHYSX)
-  link_directories($ENV{HOME}/.local/lib/PhysX)
-endif()
+################################################################################
 
 file(GLOB SRC_AlgoLewiner rai/src/Algo/Lewiner/*.cpp)
 file(GLOB SRC_GeoGJK rai/src/Geo/GJK/*.c)
@@ -133,139 +118,105 @@ add_library(rai SHARED
 
 ################################################################################
 
-if(MODULE_Vive)
-  add_definitions(-DRAI_Vive)
-  target_sources(rai src/ViveController/vivecontroller.cpp)
-  message(STATUS "[rai] compiling module Vive")
-endif()
-  
-################################################################################
-
-#find_package (Eigen3 3.3 REQUIRED NO_MODULE)
-#target_link_libraries (rai Eigen3::Eigen)
 find_package(PkgConfig REQUIRED)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(GLUT REQUIRED)
+find_package(Boost REQUIRED)
+pkg_check_modules(DEPS REQUIRED IMPORTED_TARGET
+  glfw3 glew glu gl x11 xrandr xxf86vm xi
+  yaml-0.1 libpng assimp ccd portaudio-2.0 hidapi-hidraw)
+find_library(FCL_LIB NAMES fcl REQUIRED)  # not via pkg-config: fcl.pc forces -std=c++11
+
+find_library(ANN_LIB NAMES ANN ann REQUIRED)
+find_library(QHULL_LIB NAMES qhullstatic REQUIRED)
+find_library(LAPACK_LIB NAMES lapack REQUIRED)
+find_library(BLAS_LIB NAMES blas REQUIRED)
+
+target_link_libraries(rai PUBLIC
+  Eigen3::Eigen
+  ${FCL_LIB}
+  PkgConfig::DEPS
+  GLUT::GLUT
+  Boost::headers
+  ${ANN_LIB} ${QHULL_LIB} ${LAPACK_LIB} ${BLAS_LIB}
+  pthread rt dl
+  )
 
 if(USE_FREETYPE)
   find_package(Freetype REQUIRED)
-  add_definitions(-DRAI_FREETYPE)
-  include_directories(rai ${FREETYPE_INCLUDE_DIRS})
-  target_link_libraries(rai ${FREETYPE_LIBRARIES})
-  message(STATUS "[rai] using freetype2 libs: " ${FREETYPE_LIBRARIES})
+  target_compile_definitions(rai PUBLIC RAI_FREETYPE)
+  target_link_libraries(rai PUBLIC Freetype::Freetype)
 endif()
 
 if(USE_H5)
-  find_package(HDF5 REQUIRED)
-  add_definitions(-DRAI_H5)
-  include_directories(${HDF5_INCLUDE_DIRS})
-  target_link_libraries(rai hdf5_cpp hdf5 z)
-  message(STATUS "[rai] using H5 libs: hdf5 hdf5_cpp in " ${HDF5_INCLUDE_DIRS})
-endif()
-
-if(USE_BULLET)
-  find_package(Bullet REQUIRED)
-  add_definitions(-DRAI_BULLET)
-  include_directories(${BULLET_INCLUDE_DIRS})
-  target_link_libraries(rai ${BULLET_LIBRARIES})
-  message(STATUS "[rai] using bullet libs: " ${BULLET_LIBRARIES})
+  find_package(HDF5 REQUIRED COMPONENTS C CXX)
+  target_compile_definitions(rai PUBLIC RAI_H5)
+  target_include_directories(rai PUBLIC ${HDF5_INCLUDE_DIRS})
+  target_link_libraries(rai PUBLIC ${HDF5_CXX_LIBRARIES} ${HDF5_C_LIBRARIES})
 endif()
 
 if(USE_PHYSX)
-  add_definitions(-DRAI_PHYSX -DNDEBUG -DPX_DISABLE_FLUIDS -DCORELIB -DPX32 -DLINUX)
-  target_link_libraries(rai PhysXExtensions_static_64 PhysX_static_64 PhysXCooking_static_64 PhysXCommon_static_64 PhysXFoundation_static_64)
-  message(STATUS "[rai] using physx libs from ~/.local")
-endif()
-
-if(USE_OPENCV_sys)
-  find_package(OpenCV REQUIRED)
-  add_definitions(-DRAI_OPENCV)
-  target_link_libraries(rai ${OpenCV_LIBS})
-  message(STATUS "[rai] using OpenCV libs:" ${OpenCV_LIBS})
+  find_path(PHYSX_INCLUDE_DIR PxPhysicsAPI.h REQUIRED)
+  set(PHYSX_LIB_DIR "${PHYSX_INCLUDE_DIR}/../lib/PhysX")
+  if(NOT EXISTS "${PHYSX_LIB_DIR}/libPhysX_static_64.a")
+    message(FATAL_ERROR "[botop] PhysX not found in ${PHYSX_LIB_DIR} -- run 'pixi run deps'")
+  endif()
+  target_compile_definitions(rai PUBLIC RAI_PHYSX NDEBUG PX_DISABLE_FLUIDS CORELIB PX32 LINUX)
+  target_include_directories(rai PUBLIC ${PHYSX_INCLUDE_DIR})
+  foreach(px PhysXExtensions PhysX PhysXCooking PhysXCommon PhysXFoundation)
+    target_link_libraries(rai PUBLIC "${PHYSX_LIB_DIR}/lib${px}_static_64.a")
+  endforeach()
 endif()
 
 if(USE_OPENCV)
-  add_definitions(-DRAI_OPENCV)
-  include_directories($ENV{HOME}/.local/include/opencv5)
-  target_link_libraries(rai opencv_highgui opencv_imgproc opencv_videoio opencv_objdetect opencv_core ittnotify ippiw ipphal ippicv)
-  # target_link_libraries(rai PRIVATE libopencv_core.a libopencv_features.a libopencv_geometry.a libopencv_stereo.a libopencv_highgui.a libopencv_imgproc.a libopencv_video.a libopencv_videoio.a libopencv_objdetect.a libopencv_calib.a  libopencv_dnn.a       libopencv_flann.a     libopencv_highgui.a    libopencv_imgproc.a    libopencv_photo.a         libopencv_core.a   libopencv_imgcodecs.a  libopencv_objdetect.a  libopencv_ptcloud.a  libopencv_stitching.a  libopencv_videoio.a libittnotify.a  liblibclapack.a  liblibprotobuf.a libippiw.a  libipphal.a libippicv.a)
-  message(STATUS "[rai] using OpenCV libs from ~/.local")
-endif()
-
-if(USE_OPENVR)
-  pkg_check_modules(OpenVR REQUIRED openvr)
-  add_definitions(-DRAI_OPENVR)
-  target_compile_options(rai PUBLIC ${OpenVR_CFLAGS_OTHER})
-  target_include_directories(rai PUBLIC ${OpenVR_INCLUDE_DIRS})
-  target_link_libraries(rai ${OpenVR_LIBRARIES})
-  message(STATUS "[rai] using OpenVR libs: " ${OpenVR_LIBRARIES})
-  # -I/usr/include/openvr -L/usr/lib/openvr -lopenvr_apis
-  #target_link_libraries(rai openvr_api)
-  #link_directories(
-  #$ENV{HOME}/.local/lib/vrqtlibs
-  #)
+  find_package(OpenCV REQUIRED COMPONENTS core imgproc highgui videoio objdetect)
+  target_compile_definitions(rai PUBLIC RAI_OPENCV)
+  target_link_libraries(rai PUBLIC ${OpenCV_LIBS})
 endif()
 
 if(USE_REALSENSE)
-  add_definitions(-DRAI_REALSENSE)
-  target_link_libraries(rai realsense2 realsense-file rsutils usb-1.0)
-  message(STATUS "[rai] using realsense libs")
+  find_package(realsense2 REQUIRED)
+  target_compile_definitions(rai PUBLIC RAI_REALSENSE)
+  target_link_libraries(rai PUBLIC realsense2::realsense2)
 endif()
 
 if(USE_LIBFRANKA)
-  add_definitions(-DRAI_FRANKA)
-  target_link_libraries(rai franka PocoNet PocoFoundation)
-  message(STATUS "[rai] using libfranka")
+  find_package(Franka REQUIRED)
+  target_compile_definitions(rai PUBLIC RAI_FRANKA)
+  target_link_libraries(rai PUBLIC Franka::Franka)
 endif()
-
-# default/required dependencies
-target_link_libraries(rai
-  # ORDER MATTERS! test with -no-undefined linker flag (above)
-  lapack blas
-  glfw GLEW glut Xrandr Xxf86vm Xi GLU GL
-  jsoncpp yaml png assimp z
-  fcl ccd ANN qhull
-  portaudio
-  hidapi-hidraw
-  boost_system pthread rt X11 dl
-  )
 
 ################################################################################
 
 if(USE_PYBIND)
-  set(PYTHON_EXECUTABLE "python${PY_VERSION}")
-  find_package(Python3 ${PY_VERSION} EXACT COMPONENTS Interpreter Development)
-  message(STATUS "[rai] requested python version " ${PY_VERSION} )
-  message(STATUS "[rai] using python executable " ${PYTHON_EXECUTABLE} )
-  execute_process(
-    COMMAND bash "-c" "${PYTHON_EXECUTABLE} -m pybind11 --cmakedir" 
-    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE pybind11_DIR
-  )
-  message(STATUS "[rai] using pybind11_DIR " ${pybind11_DIR} )
-  
-  find_package(pybind11)
-  
-  pybind11_add_module(_robotic SHARED
+  find_package(Python 3 REQUIRED COMPONENTS Interpreter Development.Module)
+  find_package(pybind11 CONFIG REQUIRED)
+
+  pybind11_add_module(_robotic
     rai/src/ry/unity.cxx
     src/BotOp/py-BotOp.cxx
   )
-
   target_compile_definitions(_robotic PUBLIC RAI_PYBIND)
-  target_include_directories(_robotic PUBLIC ${pybind11_INCLUDE_DIRS})
   target_link_libraries(_robotic PRIVATE rai)
+
+  set(PY_LIB_SITE "${Python_SITEARCH}")
+  message(STATUS "[botop] python ${Python_VERSION}, installing package 'robotic' in ${PY_LIB_SITE}")
+
+  add_custom_target(docstrings
+    DEPENDS _robotic
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMAND env PYTHONPATH="." ${Python_EXECUTABLE} -m pybind11_stubgen --ignore-all-errors _robotic
+    COMMAND mv stubs/_robotic*/__init__.pyi _robotic.pyi
+    COMMAND mv stubs/_robotic*/*.pyi .)
 endif()
 
 ################################################################################
 
 get_property(_defs DIRECTORY PROPERTY COMPILE_DEFINITIONS)
-message(STATUS "[rai] compiler flags: " "${_defs}")
-message(STATUS "[rai] source dir: " "${CMAKE_SOURCE_DIR}")
+message(STATUS "[botop] compiler flags: " "${_defs}")
+message(STATUS "[botop] install prefix: " "${CMAKE_INSTALL_PREFIX}")
 
 ################################################################################
-
-add_custom_target(docstrings #ALL
-  DEPENDS _robotic
-  COMMAND env PYTHONPATH="." ${PYTHON_EXECUTABLE} -m pybind11_stubgen --ignore-all-errors _robotic
-  COMMAND mv stubs/_robotic*/__init__.pyi _robotic.pyi
-  COMMAND mv stubs/_robotic*/*.pyi .)
 
 add_executable(kinEdit rai/bin/src_kinEdit/main.cpp)
 target_link_libraries(kinEdit rai)
@@ -276,23 +227,32 @@ target_link_libraries(meshTool rai)
 add_executable(bot bin/bot/main.cpp)
 target_link_libraries(bot rai)
 
-################################################################################
+if(BUILD_TESTS)
+  file(GLOB tests test/*/main.cpp)
+  foreach(file ${tests})
+    get_filename_component(path ${file} DIRECTORY)
+    get_filename_component(name ${path} NAME)
+    add_executable(test_${name} ${file})
+    target_link_libraries(test_${name} rai)
+    set_target_properties(test_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${path})
+  endforeach()
+endif()
 
-message(STATUS "[rai] installing python packages in " ${PY_LIB_SITE}/robotic )
+################################################################################
 
 file(GLOB SRC_botopSrc rai/src/* src/*)
 
-install(
-  TARGETS _robotic
-  DESTINATION ${PY_LIB_SITE}/robotic)
-
-install(
-  DIRECTORY rai-robotModels
-  DESTINATION ${PY_LIB_SITE}/robotic
-  FILES_MATCHING
-  PATTERN "*.g" PATTERN "*.ply"
-  PATTERN "retired" EXCLUDE
-  )
+if(USE_PYBIND)
+  install(TARGETS _robotic DESTINATION ${PY_LIB_SITE}/robotic)
+  install(DIRECTORY python/robotic/ DESTINATION ${PY_LIB_SITE}/robotic)
+  install(
+    DIRECTORY rai-robotModels
+    DESTINATION ${PY_LIB_SITE}/robotic
+    FILES_MATCHING
+    PATTERN "*.g" PATTERN "*.ply"
+    PATTERN "retired" EXCLUDE
+    )
+endif()
 
 install(
   DIRECTORY ${SRC_botopSrc}
@@ -301,12 +261,6 @@ install(
   PATTERN "*.h" PATTERN "*.ipp"
   PATTERN "*retired*" EXCLUDE
   )
-  
-install(
-  TARGETS rai
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-  COMPONENT pkgconfig)
 
-install(
-  TARGETS kinEdit meshTool bot
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS rai DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(TARGETS kinEdit meshTool bot DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
