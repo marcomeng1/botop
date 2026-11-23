@@ -46,6 +46,7 @@ PyPI-only Python packages can be added under `[pypi-dependencies]` in
 
 ```bash
 pixi run install
+pixi run bot -help                         # list all actions
 pixi run bot -sim -home                    # move home
 pixi run bot -sim -loop                    # move back and forth
 pixi run bot -sim -open                    # also -close, -float, -damp, -hold
@@ -184,7 +185,7 @@ Command line arguments `-<key> <value>` override parameters in `rai.cfg`
 | `src/Sim/` | PhysX simulation backend (`BotThreadedSim`, simulated gripper and cameras) |
 | `src/<driver>/` | hardware drivers: Franka, Robotiq, Omnibase, RealSense, OptiTrack, Audio |
 | `skills/` | helpers on top of BotOp (`libbotop_skills`, `-DBUILD_SKILLS`): `motion/Move_IK`, `control/SecMPC_Stepper`, `perception/senseHsvBlob`; include as `<skills/...>` |
-| `bin/bot/` | `bot` command line tool, minimal BotOp example |
+| `bin/bot/` | `bot` command line tool to operate the robot (home, open/close gripper, float, ...); also the minimal BotOp example |
 | `test/examples/` | C++ examples; build with `-DBUILD_TESTS=ON` (overview in its README) |
 | `test/py/` | Python smoke test |
 | `rai/` | submodule: core algorithms (kinematics, KOMO, optimization, perception, ...); generic helpers formerly in botop live here: `KOMO/motionHelpers.h`, `Perception/ArucoThread.h`, `Perception/cvTools.h` |
