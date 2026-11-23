@@ -35,6 +35,7 @@ or activate an environment with `pixi shell` (or `pixi shell -e hw`) and call
 | `install` | `build` + install into the current environment |
 | `install-all` | `install` for both `default` and `hw` |
 | `test-py` | run `test/py/test.py` |
+| `notebooks` | execute `test/py/*.ipynb` (outputs go to `build/notebooks`) |
 | `stubs` | generate `_robotic.pyi` |
 | `clean` | remove `build/` |
 

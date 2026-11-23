@@ -41,13 +41,12 @@ xorg-libxi = "*"
 freetype = "*"
 
 # io / misc
-yaml-cpp = "*"
+yaml = "*"         # libyaml (rai Core/graph.cpp)
 libpng = "*"
 zlib = "*"
 hdf5 = "*"
 portaudio = "*"
 libhidapi = "*"
-libusb = "*"
 libboost-devel = "<1.87"   # OptiTrack uses boost::asio::io_service, removed in 1.87
 opencv = "*"
 
@@ -76,6 +75,8 @@ install-all = { cmd = "pixi run -e default install && pixi run -e hw install", d
 stubs = { cmd = "cmake --build build/$PIXI_ENVIRONMENT_NAME --target docstrings", depends-on = ["build"] }
 
 test-py = { cmd = "python test/py/test.py", depends-on = ["install"], description = "Smoke test of the robotic python module (simulation)" }
+
+notebooks = { cmd = "jupyter nbconvert --to notebook --execute --output-dir ../../build/notebooks *.ipynb", cwd = "test/py", depends-on = ["install"], description = "Execute the notebooks in test/py (results in build/notebooks)" }
 
 clean = "rm -rf build"
 

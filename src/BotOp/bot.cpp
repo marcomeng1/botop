@@ -13,9 +13,6 @@
 #include <OptiTrack/optitrack.h>
 #include <RealSense/RealSenseThread.h>
 #include <Perception/ArucoThread.h>
-#ifdef RAI_VIVE
-#  include <ViveController/vivecontroller.h>
-#endif
 
 #include <Audio/audio.h>
 
@@ -99,15 +96,6 @@ BotOp::BotOp(rai::Configuration& C, bool useRealRobot){
     optitrack->pull(C);
   }
 
-#ifdef RAI_VIVE
-  //-- launch ViveController
-  if(rai::getParameter<bool>("bot/useViveController", false)){
-    LOG(0) <<"OPENING ViveController";
-    vivecontroller = make_shared<rai::ViveController>();
-    vivecontroller->pull(C);
-  }
-#endif
-
   //-- launch Audio/Sound
   if(rai::getParameter<bool>("bot/useAudio", false)){
     LOG(0) <<"OPENING SOUND";
@@ -188,11 +176,6 @@ int BotOp::sync(rai::Configuration& C, double waitTime, rai::String viewMsg){
 
   //update optitrack state
   if(optitrack) optitrack->pull(C);
-
-#ifdef RAI_VIVE
-  //update vivecontroller state
-  if(vivecontroller) vivecontroller->pull(C);
-#endif
 
   if(cameras.N){
     auto& V = *C.get_viewer();

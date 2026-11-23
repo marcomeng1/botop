@@ -7,7 +7,6 @@
 namespace rai{
   struct GripperAbstraction;
   struct OptiTrack;
-  struct ViveController;
   struct Sound;
   struct ArucoThread;
 }
@@ -32,7 +31,6 @@ struct BotOp{
   std::shared_ptr<rai::GripperAbstraction> gripperR;
   std::shared_ptr<rai::ReferenceFeed> ref;
   std::shared_ptr<rai::OptiTrack> optitrack;
-  std::shared_ptr<rai::ViveController> vivecontroller;
   std::shared_ptr<rai::Sound> audio;
   std::shared_ptr<BotThreadedSim> simthread;
   rai::Array<std::shared_ptr<rai::CameraAbstraction>> cameras;
