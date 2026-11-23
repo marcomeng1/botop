@@ -32,8 +32,8 @@ void testGrasp() {
   arr path; //2 waypoint path
   {
     KOMO komo;
-    komo.setConfig(C, true);
     komo.setTiming(2., 1, 5., 0);
+    komo.setConfig(C, true);
     komo.addControlObjective({}, 0, 1e-0);
     komo.addObjective({}, FS_accumulatedCollisions, {}, OT_eq);
     komo.addObjective({}, FS_jointLimits, {}, OT_ineq);

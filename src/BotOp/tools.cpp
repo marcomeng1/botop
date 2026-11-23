@@ -7,8 +7,8 @@
 #include <Kin/frame.h>
 
 Move_IK::Move_IK(BotOp& _bot, rai::Configuration& _C, int _askForOK) : bot(_bot), C(_C), askForOK(_askForOK){
-  komo.setConfig(C, true);
   komo.setTiming(1., 1, 1., 0);
+  komo.setConfig(C, true);
   komo.addControlObjective({}, 0, 1e-1);
 }
 

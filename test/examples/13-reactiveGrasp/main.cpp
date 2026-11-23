@@ -105,8 +105,8 @@ void testBallFollowing() {
       .setRelativePosition(arr{-.4,.4,.4});
 
   KOMO komo;
-  komo.setConfig(C, false);
   komo.setTiming(1., 1, 5., 1);
+  komo.setConfig(C, false);
   komo.add_qControlObjective({}, 1, 1e-1);
   komo.addQuaternionNorms();
 
@@ -146,8 +146,8 @@ void testBallReaching() {
 
   //-- define constraints
   KOMO komo;
-  komo.setConfig(C, false);
   komo.setTiming(2., 1, 5., 1);
+  komo.setConfig(C, false);
   komo.add_qControlObjective({}, 1, 1e-1);
   komo.addQuaternionNorms();
   komo.addObjective({1.}, FS_positionRel, {"ball", "l_gripper"}, OT_eq, {6e1}, {0., 0., -.1});
@@ -184,8 +184,8 @@ void testPnp() {
   arr qHome = C.getJointState();
 
   KOMO komo;
-  komo.setConfig(C, true);
   komo.setTiming(3, 1, 3., 1);
+  komo.setConfig(C, true);
   komo.add_qControlObjective({}, 1, 1e-1);
 
   // homing
@@ -279,8 +279,8 @@ void testDroneRace(){
 
   //-- define constraints
   KOMO komo;
-  komo.setConfig(C, false);
   komo.setTiming(7., 1, 5., 1);
+  komo.setConfig(C, false);
   komo.add_qControlObjective({}, 1, 1e-1);
   komo.addQuaternionNorms();
   komo.addObjective({1.}, FS_positionDiff, {"drone", "target0"}, OT_eq, {1e1});

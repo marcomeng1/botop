@@ -28,8 +28,8 @@ arr getLoopPath(rai::Configuration& C){
 
   //compute a path
   KOMO komo;
-  komo.setConfig(C, false);
   komo.setTiming(5, 10, 2., 2);
+  komo.setConfig(C, false);
   komo.addControlObjective({}, 2, 1.);
 
   komo.addObjective({1.}, FS_positionDiff, {"l_gripper", "target1"}, OT_eq, {1e2});
@@ -41,7 +41,7 @@ arr getLoopPath(rai::Configuration& C){
 
   komo.solve();
   arr q = komo.getPath_qOrg();
-  if(C["r_gripper"]){
+  if(C.getFrame("r_gripper", false)){
     CHECK_EQ(q.d1, 14, "");
     //special case: copy path to other arm
     q.reshape(q.d0,2,7);
@@ -170,8 +170,8 @@ arr getBoxPnpKeyframes(const rai::Configuration& C, str pickDirection, str place
   arr q0 = C.getJointState();
 
   KOMO komo;
-  komo.setConfig(C, true);
   komo.setTiming(2, 1, 3., 1);
+  komo.setConfig(C, true);
   komo.addControlObjective({}, 1, 1e-1);
 
   // homing

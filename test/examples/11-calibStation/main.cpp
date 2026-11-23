@@ -38,8 +38,8 @@ void collectData(){
     //compute pose
     if(l<L){
       KOMO komo;
-      komo.setConfig(C, true);
       komo.setTiming(1, 1, 3., 1);
+      komo.setConfig(C, true);
       komo.add_qControlObjective({}, 1, 1e-1);
       komo.addObjective({}, FS_qItself, {}, OT_sos, {.1}, bot.qHome);
       komo.addObjective({}, FS_accumulatedCollisions, {}, OT_eq, {1e1});
@@ -155,8 +155,8 @@ void computeCalibration(){
 
   //-- create komo
   KOMO komo;
-  komo.setConfig(C, false);
   komo.setTiming(1., T, 1., 1);
+  komo.setConfig(C, false);
   komo.setupPathConfig();
 
   //-- set the joint path with loaded q -- using set_x we first need to deactivate the morpho joints
@@ -258,8 +258,8 @@ void demoCalibration(){
     //compute pose
     if(l<L){
       KOMO komo;
-      komo.setConfig(C, true);
       komo.setTiming(1, 1, 3., 1);
+      komo.setConfig(C, true);
       komo.add_qControlObjective({}, 1, 1e-1);
       komo.addObjective({}, FS_qItself, {}, OT_sos, {.1}, bot.qHome);
 //      komo.addObjective({}, FS_accumulatedCollisions, {}, OT_eq, {1e1});
