@@ -7,7 +7,7 @@
 int main(int argc, char** argv) {
   rai::initCmdLine(argc, argv);
 
-  rai::realsense::MultiRealSenseThread RS({"102422075114", "102422071099"}, {}, {}, true, false);
+  rai::realsense::MultiRealSenseThread RS({"102422075114", "102422071099"}, true, false);
   uint V = RS.getNumberOfCameras();
   std::vector<OpenGL> windows(V);
 

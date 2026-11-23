@@ -1,4 +1,5 @@
 #include <BotOp/bot.h>
+#include <Kin/frame.h>
 #include <KOMO/motionHelpers.h>
 #include <KOMO/pathTools.h>
 

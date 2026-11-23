@@ -1,5 +1,7 @@
 #include <BotOp/bot.h>
-#include <Control/SecMPC.h>
+#include <skills/control/SecMPC_Stepper.h>
+#include <KOMO/motionHelpers.h>
+#include <KOMO/skeletonSymbol.h>
 #include <OptiTrack/optitrack.h>
 #include <KOMO/manipTools.h>
 #include <KOMO/pathTools.h>
@@ -11,30 +13,16 @@
 
 struct SecMPC_Experiments{
   rai::Configuration& C;
-  unique_ptr<SecMPC> mpc;
+  KOMO& komo;
+  double timeCost, ctrlCost;
   unique_ptr<BotOp> bot;
-  Metronome tic;
-  uint stepCount = 0;
+  unique_ptr<SecMPC> mpc;
+  SecMPC_Stepper stepper;
 
-  KOMO *__komo=0;
-  double timeCost=1e0, ctrlCost=1e0;
+  SecMPC_Experiments(rai::Configuration& _C, KOMO& _komo, double cycleTime=.1, double _timeCost=1e1, double _ctrlCost=1e-2)
+    : C(_C), komo(_komo), timeCost(_timeCost), ctrlCost(_ctrlCost), stepper(cycleTime) {}
 
-  SecMPC_Experiments(rai::Configuration& _C, ObjectiveL& phi, double cycleTime=.1)
-    : C(_C),
-      tic(cycleTime)
-      {
-  }
-
-  SecMPC_Experiments(rai::Configuration& _C, KOMO& komo, double cycleTime=.1, double timeCost=1e1, double ctrlCost=1e-2)
-    : C(_C),
-      tic(cycleTime),
-      __komo(&komo),
-      timeCost(timeCost), ctrlCost(ctrlCost){
-  }
-
-  bool step(ObjectiveL& phi){
-    stepCount++;
-
+  bool step(){
     //-- start a robot thread
     if(!bot){
       bot = make_unique<BotOp>(C, rai::getParameter<bool>("real", false));
@@ -44,54 +32,14 @@ struct SecMPC_Experiments{
       rai::wait(.2);
     }
 
-    if(!mpc){
-      //needs to be done AFTER bot initialization (optitrack..)
-      if(__komo){
-        mpc = make_unique<SecMPC>(C, *__komo, C.getJointState(), timeCost, ctrlCost);
-      }else{
-        mpc = make_unique<SecMPC>(C, phi, C.getJointState(), timeCost, ctrlCost);
-      }
-    }
+    //-- needs to be done AFTER bot initialization (optitrack..)
+    if(!mpc) mpc = make_unique<SecMPC>(komo, 0, -1, timeCost, ctrlCost);
 
-    //-- iterate
-    tic.waitForTic();
-
-    //-- get optitrack
-    if(bot->optitrack) bot->optitrack->pull(C);
-
-    //-- get current state (time,q,qDot)
-    arr q,qDot, q_ref, qDot_ref;
-    double ctrlTime = 0.;
-    bot->getState(q, qDot, ctrlTime);
-    bot->getReference(q_ref, qDot_ref, NoArr, q, qDot, ctrlTime);
-
-    //-- iterate MPC
-    mpc->cycle(C, phi, q_ref, qDot_ref, q, qDot, ctrlTime);
-    mpc->report(C, phi);
-
-    //-- send spline update
-    auto sp = mpc->getSpline(bot->get_t());
-    if(sp.pts.N) bot->move(sp.pts, sp.vels, sp.times, true);
-
-    //-- update C
-    bot->step(C, .0);
-    if(bot->keypressed=='q' || bot->keypressed==27) return false;
-
-    return true;
+    return stepper.step(C, *bot, *mpc);
   }
+
+  uint stepCount() const { return stepper.stepCount; }
 };
-
-//===========================================================================
-
-void randomWalkPosition(rai::Frame* f, arr& centerPos, arr& velocity, double rate=.001){
-  arr pos = f->getPosition();
-  if(!centerPos.N) centerPos = pos;
-  if(!velocity.N) velocity = zeros(pos.N);
-  rndGauss(velocity, rate, true);
-  pos += velocity;
-  pos = centerPos + .9 * (pos - centerPos);
-  f->setPosition(pos);
-}
 
 //===========================================================================
 
@@ -107,7 +55,7 @@ void testBallFollowing() {
   KOMO komo;
   komo.setTiming(1., 1, 5., 1);
   komo.setConfig(C, false);
-  komo.add_qControlObjective({}, 1, 1e-1);
+  komo.addControlObjective({}, 1, 1e-1);
   komo.addQuaternionNorms();
 
   komo.addObjective({1.}, FS_positionDiff, {"l_gripper", "ball"}, OT_eq, {1e1});
@@ -124,7 +72,7 @@ void testBallFollowing() {
   bool useSimulatedBall=!rai::getParameter<bool>("bot/useOptitrack", false);
   arr ballVel, ballCen;
 
-  while(ex.step(komo.objectives)){
+  while(ex.step()){
     if(useSimulatedBall){
       randomWalkPosition(C["ball"], ballCen, ballVel, .001);
     }else{
@@ -148,27 +96,27 @@ void testBallReaching() {
   KOMO komo;
   komo.setTiming(2., 1, 5., 1);
   komo.setConfig(C, false);
-  komo.add_qControlObjective({}, 1, 1e-1);
+  komo.addControlObjective({}, 1, 1e-1);
   komo.addQuaternionNorms();
   komo.addObjective({1.}, FS_positionRel, {"ball", "l_gripper"}, OT_eq, {6e1}, {0., 0., -.1});
   komo.addObjective({1., 2.}, FS_positionRel, {"ball", "l_gripper"}, OT_eq, {{2,3},{1e1,0,0,0,1e1,0}});
   komo.addObjective({2.}, FS_positionDiff, {"l_gripper", "ball"}, OT_eq, {6e1});
 
   SecMPC_Experiments ex(C, komo, .1, 1e0, 1e0);
-  ex.step(komo.objectives);
+  ex.step();
   ex.mpc->timingMPC.backtrackingTable=uintA{0, 0};
 
   bool useSimulatedBall=!rai::getParameter<bool>("bot/useOptitrack", false);
   arr ballVel = {.0, .0, .0};
   arr ballCen = C["ball"]->getPosition();
 
-  while(ex.step(komo.objectives)){
+  while(ex.step()){
     if(useSimulatedBall){
-      if(!(ex.stepCount%20)){
+      if(!(ex.stepCount()%20)){
         ballVel(0) = .01 * rnd.gauss();
         ballVel(2) = .01 * rnd.gauss();
       }
-      if(!(ex.stepCount%40)) ballVel=0.;
+      if(!(ex.stepCount()%40)) ballVel=0.;
       randomWalkPosition(C["ball"], ballCen, ballVel);
     }else{
       C["ball"]->setPosition(C["HandStick"]->getPosition());
@@ -186,7 +134,7 @@ void testPnp() {
   KOMO komo;
   komo.setTiming(3, 1, 3., 1);
   komo.setConfig(C, true);
-  komo.add_qControlObjective({}, 1, 1e-1);
+  komo.addControlObjective({}, 1, 1e-1);
 
   // homing
   if(qHome.N) komo.addObjective({}, FS_qItself, {}, OT_sos, {.1}, qHome);
@@ -196,7 +144,6 @@ void testPnp() {
   const char* gripperName="l_gripper";
   const char* palmName="l_palm";
   const char* boxName="box";
-  const char* targetName="target";
   //const char* arm1Name="l_panda_coll7";
   //const char* arm2Name="l_panda_coll6";
   arr boxSize={.06,.15,.09};
@@ -204,23 +151,23 @@ void testPnp() {
   rai::Enum<rai::ArgWord> placeDirection = rai::_zAxis;
 
   //-- pick
-  addBoxPickObjectives(komo, 1., pickDirection, boxName, boxSize, gripperName, palmName, targetName, true);
+  addBoxPickObjectives_botop(komo, 1., pickDirection, boxName, boxSize, gripperName, palmName, "table");
   komo.addModeSwitch({2.,3.}, rai::SY_stable, {gripperName, boxName}, true);
-  addBoxPickObjectives(komo, 2., pickDirection, boxName, boxSize, gripperName, palmName, targetName);
+  addBoxPickObjectives_botop(komo, 2., pickDirection, boxName, boxSize, gripperName, palmName, "table");
 
   //-- place
   komo.addModeSwitch({3.,-1.}, rai::SY_stable, {"table", boxName}, false);
-  addBoxPlaceObjectives(komo, 3., placeDirection, boxName, boxSize, targetName, gripperName, palmName);
+  addBoxPlaceObjectives_botop(komo, 3., placeDirection, boxName, boxSize, gripperName, palmName);
 
 #if 1 //only for development
-  komo.optimize();
-  cout <<komo.getReport(true);
+  komo.solve();
+  cout <<komo.report(true);
   komo.view(true, "optimized motion");
   while(komo.view_play(true));
 #endif
 
   SecMPC_Experiments ex(C, komo, .1, 1e0, 1e0);
-  while(ex.step(komo.objectives));
+  while(ex.step());
 }
 
 //===========================================================================
@@ -231,11 +178,14 @@ void testPushing() {
 
 
   //-- define constraints
-  ObjectiveL phi;
-  phi.add({1.}, make_shared<F_PushRadiusPrior>(.13), C, {"stickTip", "puck", "target"}, OT_eq, {1e1}, {0., 0., .1});
-  phi.add({2.}, make_shared<F_PushRadiusPrior>(.10), C, {"stickTip", "puck", "target"}, OT_eq, {1e1});
-  phi.add({3.}, make_shared<F_PushRadiusPrior>(.02), C, {"stickTip", "puck", "target"}, OT_eq, {1e1});
-  phi.add({1., 3.}, make_shared<F_PushAligned>(), C, {"stickTip", "puck", "target"}, OT_eq, {{1,3},{0,0,1e1}});
+  KOMO komo;
+  komo.setTiming(3., 1, 5., 1);
+  komo.setConfig(C, false);
+  komo.addControlObjective({}, 1, 1e-1);
+  komo.addObjective({1.}, make_shared<F_PushRadiusPrior>(.13), {"stickTip", "puck", "target"}, OT_eq, {1e1}, {0., 0., .1});
+  komo.addObjective({2.}, make_shared<F_PushRadiusPrior>(.10), {"stickTip", "puck", "target"}, OT_eq, {1e1});
+  komo.addObjective({3.}, make_shared<F_PushRadiusPrior>(.02), {"stickTip", "puck", "target"}, OT_eq, {1e1});
+  komo.addObjective({1., 3.}, make_shared<F_PushAligned>(), {"stickTip", "puck", "target"}, OT_eq, arr{{1,3},{0,0,1e1}});
   //phi.add({1., 2.}, FS_positionRel, C, {"ball", "l_gripper"}, OT_eq, {{2,3},{1e1,0,0,0,1e1,0}});
   //phi.add({2.}, FS_positionDiff, C, {"l_gripper", "ball"}, OT_eq, {1e1});
 
@@ -260,11 +210,11 @@ void testPushing() {
 
   bool useOptitrack=rai::getParameter<bool>("bot/useOptitrack", false);
 
-  SecMPC_Experiments ex(C, phi);
-  ex.step(phi);
+  SecMPC_Experiments ex(C, komo, .1, 1e0, 1e0);
+  ex.step();
   ex.mpc->timingMPC.backtrackingTable=uintA{0, 0, 0, 0, 0};
 
-  while(ex.step(phi)){
+  while(ex.step()){
     if(useOptitrack){
       C["puck"]->setPosition(C["b1"]->getPosition());
     }
@@ -281,7 +231,7 @@ void testDroneRace(){
   KOMO komo;
   komo.setTiming(7., 1, 5., 1);
   komo.setConfig(C, false);
-  komo.add_qControlObjective({}, 1, 1e-1);
+  komo.addControlObjective({}, 1, 1e-1);
   komo.addQuaternionNorms();
   komo.addObjective({1.}, FS_positionDiff, {"drone", "target0"}, OT_eq, {1e1});
   komo.addObjective({2.}, FS_positionDiff, {"drone", "target1"}, OT_eq, {1e1});
@@ -297,12 +247,12 @@ void testDroneRace(){
 #if 1
   //-- reactive control
   SecMPC_Experiments ex(C, komo, .1, 1e0, 1e0);
-  ex.step(komo.objectives);
-  ex.mpc->tauCutoff = .1;
+  ex.step();
+  ex.mpc->opt.set_tauCutoff(.1);
 
   //void CubicSplineCtrlReference::getReference(arr& q_ref, arr& qDot_ref, arr& qDDot_ref, const arr& q_real, const arr& qDot_real, double ctrlTime){
 
-  while(ex.step(komo.objectives)){
+  while(ex.step()){
     if(ex.mpc->timingMPC.phase==5){ //hard code endless loop by phase backtracking
       ex.mpc->timingMPC.update_setPhase(1);
     }

@@ -334,10 +334,10 @@ void komoCalibrate(){
   komo.view(true, "before optim");
 //  komo.pathConfig.animate();
 
-  NLP_Solver sol;
+  rai::NLP_Solver sol;
   sol.setProblem(komo.nlp());
-  sol.opt.set_stopTolerance(1e-6);
-  sol.opt.set_verbose(0);
+  sol.opt->set_stopTolerance(1e-6);
+  sol.opt->set_verbose(0);
   auto ret = sol.solve();
   cout <<komo.report(false) <<endl; //reports match per feature..
   cout <<"-- result: " <<*ret <<endl;

@@ -41,17 +41,19 @@ void test() {
 
   //-- start the franka thread
   C.ensure_indexedJoints();
-  FrankaThread robot(0, franka_getJointIndices(C,'l'));
+  Var<rai::CtrlCmdMsg> cmd;
+  Var<rai::CtrlStateMsg> state;
+  FrankaThread robot(cmd, state, 0, franka_getJointIndices(C,'l'));
 
   //comment the next line to only get gravity compensation instead of 'zero reference following' (which includes damping)
   auto ref = make_shared<ZeroReference>();
-  robot.cmd.set()->ref = ref;
+  cmd.set()->ref = ref;
   //ref->setPositionReference(robot.state.get()->q);
   //ref->setVelocityReference({.0,.0,.2,0,0,0,0});
 
   for(;;){
     if(C.view(false,STRING("time: "<<rai::realTime()))=='q') break;
-    C.setJointState(robot.state.get()->q);
+    C.setJointState(state.get()->q);
     rai::wait(.1);
   }
 }

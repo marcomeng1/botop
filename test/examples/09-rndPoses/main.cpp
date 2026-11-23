@@ -1,4 +1,5 @@
 #include <KOMO/pathTools.h>
+#include <Kin/frame.h>
 
 #include <BotOp/bot.h>
 #include <KOMO/motionHelpers.h>
@@ -22,13 +23,12 @@ void rndPoses(){
   double maxAcc = rai::getParameter<double>("maxAcc", 1.);
 
   arr qHome = C.getJointState();
-  arr limits = C.getLimits();
-  FrameL collisionPairs = C.getCollisionAllPairs();
+  arr limits = C.getJointLimits();
   //for(uint i=0;i<collisionPairs.d0;i++) cout <<"PAIR: " <<collisionPairs(i,0)->name <<' ' <<collisionPairs(i,1)->name <<endl;
 
   BotOp bot(C, rai::getParameter<bool>("real", false));
   bot.home(C);
-  arr bounds = ~C.getLimits();
+  arr bounds = C.getJointLimits();
 
   uint N=100;
   arr x_last = bot.get_q();

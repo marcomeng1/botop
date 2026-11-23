@@ -1,4 +1,5 @@
 #include <BotOp/bot.h>
+#include <Kin/frame.h>
 //#include <Control/ShortPathMPC.h>
 #include <Control/ShortPathMPC.h>
 #include <Control/timingOpt.h>
@@ -66,18 +67,17 @@ void testLeapCtrl() {
     if(shortMPC.feasible){
       arr path = shortMPC.getPath();
       TimingProblem timingProblem(path, {}, q, qDot, 1e1, 1.); //, {}, tauInitial, optTau);
-      NLP_Solver solver;
+      rai::NLP_Solver solver;
       solver
           .setProblem(timingProblem.ptr())
-          .setSolver(NLPS_newton);
-      solver.opt
-          .set_stopTolerance(1e-4)
-          .set_maxStep(1e0)
+          .setSolver(rai::M_Newton);
+      solver.opt->
+          set_stopTolerance(1e-4)
+          .set_stepMax(1e0)
           .set_damping(1e-2);
       auto ret = solver.solve();
       //LOG(1) <<"timing f: " <<ret->f;
-      arr vels, times;
-      timingProblem.getVels(vels);
+      arr times;
       times = integral(timingProblem.tau);
       //cout <<times <<endl;
 
@@ -86,7 +86,9 @@ void testLeapCtrl() {
 
         double ctrlTimeNow = bot.get_t();
         times -= ctrlTimeNow - ctrlTime;
-        bot.move(path, vels, times, true, ctrlTime);
+        uint i=0;
+        while(i<times.N && times(i)<=.001) i++; //skip waypoints that are already in the past
+        if(i<times.N) bot.move(path({i,0}), times({i,0}), true, ctrlTimeNow);
       }else{
         bot.moveTo(shortMPC.path[-1]);
       }

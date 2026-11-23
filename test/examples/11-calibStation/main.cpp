@@ -6,13 +6,15 @@
 #include <BotOp/bot.h>
 #include <KOMO/motionHelpers.h>
 #include <OptiTrack/optitrack.h>
+#include <Kin/F_qFeatures.h>
+#include <Optim/NLP_Solver.h>
 
 //===========================================================================
 
 void collectData(){
   //-- setup a configuration
   rai::Configuration C;
-  C.addFile(rai::raiPath("../rai-robotModels/scenarios/pandasTable.g"));
+  C.addFile("calibStation.g");
 
   arr points=rai::getParameter<arr>("points");
   points.reshape(-1,2,3);
@@ -40,14 +42,14 @@ void collectData(){
       KOMO komo;
       komo.setTiming(1, 1, 3., 1);
       komo.setConfig(C, true);
-      komo.add_qControlObjective({}, 1, 1e-1);
+      komo.addControlObjective({}, 1, 1e-1);
       komo.addObjective({}, FS_qItself, {}, OT_sos, {.1}, bot.qHome);
       komo.addObjective({}, FS_accumulatedCollisions, {}, OT_eq, {1e1});
 
       arr pt = points(l,0,{});
-      komo.addObjective({}, FS_positionDiff, {"r_gripper", "table_base"}, OT_eq, {1e2}, pt);
+      komo.addObjective({}, FS_positionDiff, {"r_gripper", "origin"}, OT_eq, {1e2}, pt);
       pt(0) *= -1.;
-      komo.addObjective({}, FS_positionDiff, {"l_gripper", "table_base"}, OT_eq, {1e2}, pt);
+      komo.addObjective({}, FS_positionDiff, {"l_gripper", "origin"}, OT_eq, {1e2}, pt);
 
       arr dir = points(l,1,{});
       if(length(dir)>.5){
@@ -57,17 +59,17 @@ void collectData(){
         komo.addObjective({}, FS_vectorY, {"l_gripper"}, OT_eq, {1e2}, dir);
       }
 
-      komo.optimize();
+      auto ret = komo.solve();
 
       //is feasible?
-      bool feasible=komo.sos<50. && komo.ineq<.1 && komo.eq<.1;
+      bool feasible=ret->sos<50. && ret->ineq<.1 && ret->eq<.1;
 
       if(!feasible){
         cout <<" === pose infeasible ===\n" <<points[l] <<endl;
         continue;
       }
 
-      q_target = komo.x;
+      q_target = komo.getPath_qOrg()[-1];
       cout <<" === pose feasible  === " <<endl;
     }else{
       q_target = bot.qHome;
@@ -110,7 +112,7 @@ void collectData(){
 
 void computeCalibration(){
   rai::Configuration C;
-  C.addFile(rai::raiPath("../rai-robotModels/scenarios/pandasTable.g"));
+  C.addFile("calibStation.g");
   C.addFrame("optitrack_base", "world");
   C.view();
 
@@ -121,7 +123,7 @@ void computeCalibration(){
   for(uint t=0;;t++){
     rai::skip(fil);
     if(!fil.good()) break;
-    fil >>times.append() >>PARSE("q") >>_q >>PARSE("poseL") >>_poseL >>PARSE("poseR") >>_poseR;
+    fil >>times.append() >>rai::PARSE("q") >>_q >>rai::PARSE("poseL") >>_poseL >>rai::PARSE("poseR") >>_poseR;
     if(fabs(_poseL(0))>1e-10 && fabs(_poseR(0))>1e-10){ //ignore data is pose is zero!
       q.append(_q);
       poseR.append(_poseR);
@@ -146,64 +148,60 @@ void computeCalibration(){
   rai::Frame *otL = & C.addFrame("otL", "optitrack_base")->setShape(rai::ST_marker, {.1});
   rai::Frame *otR = & C.addFrame("otR", "optitrack_base")->setShape(rai::ST_marker, {.1});
 
-  //-- create "morpho joints" - constant joints that are optimized/calibrated
-  C["optitrack_base"] ->setJoint(rai::JT_free) .addAttribute("constant", 1.);
-//  C["l_panda_base"] ->setJoint(rai::JT_transXYPhi) .addAttribute("constant", 1.);
-  C["r_panda_base"] ->setJoint(rai::JT_transXYPhi) .addAttribute("constant", 1.);
-  C["l_robotiq_optitrackMarker"] ->setJoint(rai::JT_trans3) .addAttribute("constant", 1.);
-  C["r_robotiq_optitrackMarker"] ->setJoint(rai::JT_trans3) .addAttribute("constant", 1.);
+  //-- create "morpho joints" - joints that are optimized/calibrated, kept constant over time below
+  StringA morphoJoints = {"optitrack_base", "r_panda_base", "l_robotiq_optitrackMarker", "r_robotiq_optitrackMarker"};
+  C["optitrack_base"] ->setJoint(rai::JT_free);
+//  C["l_panda_base"] ->setJoint(rai::JT_transXYPhi);
+  C["r_panda_base"] ->setJoint(rai::JT_transXYPhi);
+  C["l_robotiq_optitrackMarker"] ->setJoint(rai::JT_trans3);
+  C["r_robotiq_optitrackMarker"] ->setJoint(rai::JT_trans3);
 
   //-- create komo
   KOMO komo;
   komo.setTiming(1., T, 1., 1);
   komo.setConfig(C, false);
-  komo.setupPathConfig();
+
+  //-- the morpho joints exist in each time slice of the path config
+  FrameL morphoFrames;
+  for(rai::Frame* f:komo.pathConfig.frames) if(f->joint && morphoJoints.contains(f->name)) morphoFrames.append(f);
 
   //-- set the joint path with loaded q -- using set_x we first need to deactivate the morpho joints
-  komo.pathConfig["optitrack_base"]->joint->setActive(false);
-//  komo.pathConfig["l_panda_base"]->joint->setActive(false);
-  komo.pathConfig["r_panda_base"]->joint->setActive(false);
-  komo.pathConfig["l_robotiq_optitrackMarker"]->joint->setActive(false);
-  komo.pathConfig["r_robotiq_optitrackMarker"]->joint->setActive(false);
+  for(rai::Frame* f:morphoFrames) f->joint->setActive(false);
 
   komo.set_x(q);
   //komo.view(true, "KOMO with initialized joint path");
 
   //-- set the position path for loaded optitrack signals
   for(uint t=0;t<komo.T;t++){
-    komo.timeSlices(komo.k_order+t, otL->ID)->setPosition(poseL(t,{0,2}));
-    komo.timeSlices(komo.k_order+t, otR->ID)->setPosition(poseR(t,{0,2}));
+    komo.timeSlices(komo.k_order+t, otL->ID)->setPosition(poseL(t,{0,3}));
+    komo.timeSlices(komo.k_order+t, otR->ID)->setPosition(poseR(t,{0,3}));
   }
 
   //-- now we deactivate all normal joints, and only activate the morpho joints
-  komo.pathConfig.setActiveJoints({});
-  komo.pathConfig["optitrack_base"]->joint->setActive(true);
-//  komo.pathConfig["l_panda_base"]->joint->setActive(true);
-  komo.pathConfig["r_panda_base"]->joint->setActive(true);
-  komo.pathConfig["l_robotiq_optitrackMarker"]->joint->setActive(true);
-  komo.pathConfig["r_robotiq_optitrackMarker"]->joint->setActive(true);
+  komo.pathConfig.selectJoints(morphoFrames);
 
   //-- add objectives: just square errors in marker positions
-  komo.addSquaredQuaternionNorms();
+  komo.addQuaternionNorms(NoArr, 3., false);
+  for(const rai::String& j:morphoJoints) komo.addObjective({}, make_shared<F_qZeroVel>(), {j}, OT_eq, {1e2}, NoArr, 1);
   komo.addObjective({}, FS_positionDiff, {"otL", "l_robotiq_optitrackMarker"}, OT_sos, {1e1});
   komo.addObjective({}, FS_positionDiff, {"otR", "r_robotiq_optitrackMarker"}, OT_sos, {1e1});
   //komo.addObjective({}, FS_qItself, {"l_panda_base"}, OT_eq, {1e1}, {-.4, -.3,0.5*RAI_PI});
 
   //-- optimize
-  komo.optimize(0., rai::OptOptions()
+  komo.solve(0., -1, rai::OptOptions()
                 .set_verbose(6)
                 .set_damping(1e-6)
                 .set_stopTolerance(1e-6) );
 
   //-- report
-  cout <<komo.getReport(true) <<endl;
+  cout <<komo.report(true) <<endl;
   cout <<"\n CALIBRATION FILE:\n\n" <<endl;
-  cout <<"Include 'pandasTable.g'" <<endl;
-  cout <<"optitrack_base (world) { Q:" <<komo.pathConfig["optitrack_base"]->get_Q() <<" }" <<endl;
-  cout <<"Edit l_panda_base { Q:<" <<komo.pathConfig["l_panda_base"]->get_Q() <<"> }" <<endl;
-  cout <<"Edit r_panda_base { Q:<" <<komo.pathConfig["r_panda_base"]->get_Q() <<"> }" <<endl;
-  cout <<"Edit l_robotiq_optitrackMarker { Q:<" <<komo.pathConfig["l_robotiq_optitrackMarker"]->get_Q() <<"> }" <<endl;
-  cout <<"Edit r_robotiq_optitrackMarker { Q:<" <<komo.pathConfig["r_robotiq_optitrackMarker"]->get_Q() <<"> }" <<endl;
+  cout <<"Include: <calibStation.g>" <<endl;
+  cout <<"optitrack_base (world): { Q: " <<komo.pathConfig["optitrack_base"]->get_Q() <<" }" <<endl;
+  cout <<"Edit l_panda_base: { Q: \"" <<komo.pathConfig["l_panda_base"]->get_Q() <<"\" }" <<endl;
+  cout <<"Edit r_panda_base: { Q: \"" <<komo.pathConfig["r_panda_base"]->get_Q() <<"\" }" <<endl;
+  cout <<"Edit l_robotiq_optitrackMarker: { Q: " <<komo.pathConfig["l_robotiq_optitrackMarker"]->get_Q() <<" }" <<endl;
+  cout <<"Edit r_robotiq_optitrackMarker: { Q: " <<komo.pathConfig["r_robotiq_optitrackMarker"]->get_Q() <<" }" <<endl;
   cout <<endl;
 
   //-- for extra plotting, and RMSE
@@ -241,7 +239,7 @@ void computeCalibration(){
 void demoCalibration(){
   //-- setup a configuration
   rai::Configuration C;
-  C.addFile(rai::raiPath("../rai-robotModels/scenarios/pandasTable-calibrated.g"));
+  C.addFile("calibStation-calibrated.g");
 
   arr points=rai::getParameter<arr>("demoPoints");
   points.reshape(-1,3);
@@ -260,29 +258,29 @@ void demoCalibration(){
       KOMO komo;
       komo.setTiming(1, 1, 3., 1);
       komo.setConfig(C, true);
-      komo.add_qControlObjective({}, 1, 1e-1);
+      komo.addControlObjective({}, 1, 1e-1);
       komo.addObjective({}, FS_qItself, {}, OT_sos, {.1}, bot.qHome);
 //      komo.addObjective({}, FS_accumulatedCollisions, {}, OT_eq, {1e1});
 
       arr pt = points[l];
-      komo.addObjective({}, FS_positionDiff, {"r_gripper", "table_base"}, OT_eq, {1e2}, pt);
+      komo.addObjective({}, FS_positionDiff, {"r_gripper", "origin"}, OT_eq, {1e2}, pt);
       komo.addObjective({}, FS_positionDiff, {"r_gripper", "l_gripper"}, OT_eq, {1e2}, {.05, 0., 0.});
 
       komo.addObjective({}, FS_scalarProductXY, {"r_gripper", "l_gripper"}, OT_eq, {1e2});
       komo.addObjective({}, FS_vectorZ, {"r_gripper"}, OT_eq, {1e2}, {1.,0.,0.});
       komo.addObjective({}, FS_vectorZ, {"l_gripper"}, OT_eq, {1e2}, {-1.,0.,0.});
 
-      komo.optimize();
+      auto ret = komo.solve();
 
       //is feasible?
-      bool feasible=komo.sos<50. && komo.ineq<.1 && komo.eq<.1;
+      bool feasible=ret->sos<50. && ret->ineq<.1 && ret->eq<.1;
 
       if(!feasible){
         cout <<" === pose infeasible ===\n" <<points[l] <<endl;
         continue;
       }
 
-      q_target = komo.x;
+      q_target = komo.getPath_qOrg()[-1];
       cout <<" === pose feasible  === " <<endl;
     }else{
       q_target = bot.qHome;

@@ -6,7 +6,7 @@
 
 #include <KOMO/komo.h>
 
-#include <Optim/NLP.h>
+#include <Optim/NLP_Solver.h>
 
 #include <iomanip>
 
@@ -23,7 +23,7 @@ void testPushes(){
   byteA rgb;
   floatA depth;
 
-  arr Xstart = C.getFrameState();
+  rai::Simulation::State Xstart = S.getState();
 
   for(uint k=0;k<5;k++){
 
@@ -49,7 +49,7 @@ void testPushes(){
         p(2) += .2;
         C["box"]->setPosition(p);
 
-        S.setState(C.getFrameState());
+        S.pushConfigToSim();
       }
     }
   }
@@ -220,7 +220,7 @@ void makeRndScene(){
 
   rai::Simulation S(C, S._physx, 2);
 //  rai::Simulation S(C, S._physx);
-  S.cameraview().addSensor(C.getFrame("camera"));
+  S.addSensor("camera");
 
   byteA rgb;
   floatA depth;
@@ -272,7 +272,7 @@ void testFriction(){
 //  C["table"]->addAttribute("restitution", 10.);
 
   rai::Simulation S(C, S._physx, 2);
-  S.cameraview().addSensor(C.getFrame("camera"));
+  S.addSensor("camera");
 
   double tau=.01;
   Metronome tic(tau);
@@ -371,13 +371,13 @@ void testNoPenetrationImp(){
   tip->setRelativePosition({0,0,-0.25});
 
   KOMO komo;                     //create a solver
-  komo.setConfig(C0);        //tell it use C as the basic configuration (internally, it will create copies of C on which the actual optimization runs)
   komo.setTiming(1., 1, 1., 1);  //we want to optimize a single step (1 phase, 1 step/phase, duration=1, k_order=1)
+  komo.setConfig(C0);        //tell it use C as the basic configuration (internally, it will create copies of C on which the actual optimization runs)
   komo.addObjective({}, FS_positionRel, {"r_gripper", "stick"}, OT_eq, {1e2}, {0, 0, 0.2});
   komo.addObjective({}, FS_scalarProductXZ, {"r_gripper", "stick"}, OT_eq, {1e2});
   komo.addObjective({}, FS_vectorZ, {"r_gripper"}, OT_eq, {1e2}, {0,0,1});
 
-  komo.optimize();
+  rai::NLP_Solver(komo.nlp(), 0).solve();
   komo.view(true);
 
   C0.setJointState(komo.getConfiguration_qAll(0));
