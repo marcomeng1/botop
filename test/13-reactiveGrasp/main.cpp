@@ -1,5 +1,6 @@
 #include <BotOp/bot.h>
-#include <BotOp/SecMPC.h>
+#include <Control/SecMPC.h>
+#include <OptiTrack/optitrack.h>
 #include <KOMO/manipTools.h>
 #include <KOMO/pathTools.h>
 #include <Kin/viewer.h>
