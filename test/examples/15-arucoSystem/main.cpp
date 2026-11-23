@@ -14,9 +14,9 @@
 #include <opencv2/objdetect/aruco_detector.hpp>
 
 #include <BotOp/bot.h>
-#include <BotOp/simulation.h>
-#include <MarkerVision/ArucoThread.h>
-#include <MarkerVision/ArucoSystemThread.h>
+#include <Sim/simulation.h>
+#include <Perception/ArucoThread.h>
+#include <Perception/ArucoSystemThread.h>
 
 void test(){
   rai::Configuration C;

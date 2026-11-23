@@ -1,4 +1,11 @@
 #include "franka.h"
+#include "help.h"
+
+#include <BotOp/drivers.h>
+
+static botop::RegisterArm _registerFranka("panda_base", [](Var<rai::CtrlCmdMsg>& cmd, Var<rai::CtrlStateMsg>& state, uint robotID, const rai::Configuration& C, char side){
+  return std::make_shared<FrankaThread>(cmd, state, robotID, franka_getJointIndices(C, side));
+});
 
 #ifdef RAI_FRANKA
 
@@ -7,8 +14,6 @@
 #include <franka/exception.h>
 
 void naturalGains(double& Kp, double& Kd, double decayTime, double dampingRatio);
-
-const char *frankaIpAddresses[2] = {"172.16.0.2", "172.17.0.2"};
 
 FrankaThread::~FrankaThread(){
   LOG(0) <<"shutting down Franka " <<robotID;
@@ -39,8 +44,8 @@ void FrankaThread::init(uint _robotID, const uintA& _qIndices) {
   */
 
   //-- choose robot/ipAddress
-  CHECK_LE(robotID, 1, "");
-  ipAddress = frankaIpAddresses[robotID];
+  ipAddress = franka_ipAddress(robotID);
+  CHECK(ipAddress.N, "no IP address for Franka robot " <<robotID <<" -- set Franka/ip" <<robotID <<" in rai.cfg");
 
   //-- start thread and wait for first state signal
   LOG(0) <<"launching Franka " <<robotID <<" at " <<ipAddress;
@@ -58,7 +63,7 @@ void FrankaThread::init(uint _robotID, const uintA& _qIndices) {
 
 void FrankaThread::step(){
   // connect to robot
-  franka::Robot robot(ipAddress);
+  franka::Robot robot(ipAddress.p);
 
   // load the kinematics and dynamics model
   franka::Model model = robot.loadModel();

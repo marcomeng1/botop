@@ -79,15 +79,16 @@ binaries find them via RPATH. Pixi cannot set up the OS, so once per PC (sudo):
 
 Before the first run:
 
-* Network connection to the robot:
-  left Franka `172.16.0.2`, right Franka `172.17.0.2` (`src/Franka/`).
+* Network connection to the robot. Addresses come from `rai.cfg`, defaults:
+  `Franka/ip0: "172.16.0.2"`, `Franka/ip1: "172.17.0.2"` (robot 0, 1) and
+  `Robotiq/port0: "/dev/ttyUSB0"`, `Robotiq/port1: "/dev/ttyUSB1"` (left, right).
 * libfranka must match the robot's system version; pin it under
   `[feature.hw.dependencies]` in `pixi.toml` and re-run `pixi run -e hw install`.
 * Unlock the brakes and activate FCI in the Franka Desk interface.
 * `-bot/blockRealRobot true` forces simulation even when real is requested.
 
-`BotOp` decides which drivers to start from frame names in the model
-(`src/BotOp/bot.cpp`):
+`BotOp` decides which drivers to start from frame names in the model; each
+driver registers its frame in its own `.cpp` (`src/BotOp/drivers.h`):
 
 | frame in the model | driver |
 |---|---|
@@ -126,15 +127,28 @@ install location, so both stay incremental and do not overwrite each other.
      `pos`, `isDone` (template: `src/Robotiq`).
 
    Wrap the vendor SDK code in `#ifdef RAI_<MYARM>` with a stub in `#else`,
-   as `src/Franka` does, so the `default` environment still builds.
-4. **Build.** In `CMakeLists.txt` add `file(GLOB SRC_<MyArm> src/<MyArm>/*.cpp)`
-   to the source list and a `USE_<MYARM>` option that defines `RAI_<MYARM>`
-   and links the SDK. Add the SDK to `[feature.hw.dependencies]` in
-   `pixi.toml` if it is on conda-forge, else as a build function in
-   `scripts/build_deps.sh`.
-5. **Register.** In `BotOp::BotOp` (`src/BotOp/bot.cpp`) start the driver when
-   its base frame exists, next to the Franka/Robotiq branches. Python
-   (`ry.BotOp`) and `bot` then work without further changes.
+   as `src/Franka` does, so the `default` environment still builds. Read
+   addresses/ports with `rai::getParameter` instead of hardcoding them.
+4. **Register.** At the top of the driver's `.cpp` (outside the `#ifdef`),
+   name the frame that identifies it in the model:
+
+   ```cpp
+   #include <BotOp/drivers.h>
+   static botop::RegisterArm _reg("myarm_base",   // matches l_myarm_base / r_myarm_base
+     [](Var<rai::CtrlCmdMsg>& cmd, Var<rai::CtrlStateMsg>& state, uint robotID, const rai::Configuration& C, char side){
+       return std::make_shared<MyArmThread>(cmd, state, robotID, ...); });
+   static botop::RegisterGripper _regG("myhand_base", [](uint whichRobot){
+       return std::make_shared<MyHand>(whichRobot); });
+   ```
+
+   Pass `false` as third argument of `RegisterArm` for a frame without
+   `l_`/`r_` prefix (as `omnibase_world`). `bot.cpp` needs no change.
+5. **Build.** In `CMakeLists.txt` add `src/<MyArm>/*.cpp` to `SRC_botop` and
+   the driver to the `foreach(drv ...)` list with a `USE_<MYARM>` option
+   (defines `RAI_<MYARM>`); link the SDK to `botop`. Add the SDK to
+   `[feature.hw.dependencies]` in `pixi.toml` if it is on conda-forge, else
+   as a build function in `scripts/build_deps.sh`. Python (`ry.BotOp`) and
+   `bot` then work without further changes.
 
 ## Build and run the tests
 
@@ -152,7 +166,7 @@ local `rai.cfg`):
 
 ```bash
 pixi run cmake -S . -B build/examples -G Ninja -DBUILD_TESTS=ON -DUSE_LIBFRANKA=OFF -DUSE_REALSENSE=OFF
-pixi run cmake --build build/examples --target test_10-compliant
+pixi run cmake --build build/examples --target test_10-compliant   # or all: cmake --build build/examples -- -k 0
 cd test/examples/10-compliant
 pixi run ./test_10-compliant -real false   # simulation; press 'q' in the viewer to quit
 ```
@@ -166,17 +180,21 @@ Command line arguments `-<key> <value>` override parameters in `rai.cfg`
 
 | path | |
 |---|---|
-| `src/` | BotOp and hardware drivers (Franka, Robotiq, RealSense, OptiTrack, Omnibase, Audio, MarkerVision) |
+| `src/BotOp/` | `BotOp` interface, driver registry, Python binding (`libbotop`) |
+| `src/Sim/` | PhysX simulation backend (`BotThreadedSim`, simulated gripper and cameras) |
+| `src/<driver>/` | hardware drivers: Franka, Robotiq, Omnibase, RealSense, OptiTrack, Audio |
+| `skills/` | helpers on top of BotOp (`libbotop_skills`, `-DBUILD_SKILLS`): `motion/Move_IK`, `control/SecMPC_Stepper`, `perception/senseHsvBlob`; include as `<skills/...>` |
 | `bin/bot/` | `bot` command line tool, minimal BotOp example |
 | `test/examples/` | C++ examples; build with `-DBUILD_TESTS=ON` (several need updating to the current rai API) |
 | `test/py/` | Python smoke test |
-| `rai/` | submodule: core algorithms (kinematics, KOMO, optimization, ...) |
+| `rai/` | submodule: core algorithms (kinematics, KOMO, optimization, perception, ...); generic helpers formerly in botop live here: `KOMO/motionHelpers.h`, `Perception/ArucoThread.h`, `Perception/cvTools.h` |
 | `rai-robotModels/` | submodule: robot and scene models |
 
 ## Own code
 
-Link against `librai.so`: after `pixi run install`, headers are in
-`.pixi/envs/default/include/rai` and the library in `.pixi/envs/default/lib`.
+Link against `libbotop.so` (which pulls in `librai.so`) and, if needed,
+`libbotop_skills.so`: after `pixi run install`, headers are in
+`.pixi/envs/default/include/rai` and the libraries in `.pixi/envs/default/lib`.
 Build from within `pixi shell` so the same compiler and libraries are used.
 
 ## Documentation and related repos

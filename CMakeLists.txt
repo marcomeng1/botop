@@ -42,9 +42,13 @@ option(USE_PHYSX "link to physx" ON)
 option(USE_OPENCV "link to opencv" ON)
 option(USE_REALSENSE "link to realsense2 driver library" ON)
 option(USE_LIBFRANKA "link to libfranka" ON)
+option(USE_ROBOTIQ "Robotiq gripper driver (serial)" ON)
+option(USE_OMNIBASE "Omnibase driver" ON)
+option(USE_OPTITRACK "OptiTrack motion capture driver" ON)
 option(USE_H5 "link to h5 library" ON)
 option(USE_FREETYPE "link to freetype2 library" ON)
-option(BUILD_TESTS "build the test/examples/*/main.cpp executables" OFF)
+option(BUILD_SKILLS "build libbotop_skills (skills/: motion, control, perception helpers on top of BotOp)" ON)
+option(BUILD_TESTS "build the test/examples/*/main.cpp executables (needs BUILD_SKILLS)" OFF)
 
 ## compile options
 add_compile_options(
@@ -64,14 +68,10 @@ add_definitions(
   -DRAI_PORTAUDIO
   -DBOOST_ERROR_CODE_HEADER_ONLY
   -DRAI_BotOp
-  -DRAI_ROBOTIQ
-  -DRAI_OMNIBASE
-  -DRAI_OPTITRACK
 )
 
 include_directories(
   rai/src
-  src
   )
 
 ################################################################################
@@ -82,15 +82,6 @@ file(GLOB SRC_GeoPly rai/src/Geo/ply/*.c)
 file(GLOB SRC_GeoCcd rai/src/Geo/ccd_rai/*.c)
 file(GLOB SRC_OptLBFGS rai/src/Optim/liblbfgs/*.c)
 file(GLOB SRC_OptCMA rai/src/Optim/CMA/*.c)
-
-file(GLOB SRC_BotOp src/BotOp/*.cpp)
-file(GLOB SRC_Franka src/Franka/*.cpp)
-file(GLOB SRC_Omnibase src/Omnibase/*.cpp)
-file(GLOB SRC_OptiTrack src/OptiTrack/*.cpp)
-file(GLOB SRC_RealSense src/RealSense/*.cpp)
-file(GLOB SRC_Robotiq src/Robotiq/*.cpp)
-file(GLOB SRC_Audio src/Audio/*.cpp)
-file(GLOB SRC_MarkerVision src/MarkerVision/*.cpp)
 
 add_library(rai SHARED
   rai/src/Core/unity.cxx
@@ -113,14 +104,6 @@ add_library(rai SHARED
   rai/src/Control/unity.cxx
   rai/src/DataGen/unity.cxx
   rai/src/Perception/unity.cxx
-  ${SRC_BotOp}
-  ${SRC_Franka}
-  ${SRC_Omnibase}
-  ${SRC_OptiTrack}
-  ${SRC_RealSense}
-  ${SRC_Robotiq}
-  ${SRC_Audio}
-  ${SRC_MarkerVision}
   )
 
 ################################################################################
@@ -183,16 +166,43 @@ if(USE_OPENCV)
   target_link_libraries(rai PUBLIC ${OpenCV_LIBS})
 endif()
 
+################################################################################
+## botop: robot interface (src/BotOp), simulation (src/Sim) and drivers (src/<driver>)
+## a driver built without its option/SDK compiles to a stub
+
+file(GLOB SRC_botop
+  src/BotOp/*.cpp src/Sim/*.cpp
+  src/Franka/*.cpp src/Robotiq/*.cpp src/Omnibase/*.cpp src/OptiTrack/*.cpp src/RealSense/*.cpp src/Audio/*.cpp)
+add_library(botop SHARED ${SRC_botop})
+target_include_directories(botop PUBLIC src)
+target_link_libraries(botop PUBLIC rai)
+
 if(USE_REALSENSE)
   find_package(realsense2 REQUIRED)
-  target_compile_definitions(rai PUBLIC RAI_REALSENSE)
-  target_link_libraries(rai PUBLIC realsense2::realsense2)
+  target_compile_definitions(botop PUBLIC RAI_REALSENSE)
+  target_link_libraries(botop PUBLIC realsense2::realsense2)
 endif()
 
 if(USE_LIBFRANKA)
   find_package(Franka REQUIRED)
-  target_compile_definitions(rai PUBLIC RAI_FRANKA)
-  target_link_libraries(rai PUBLIC Franka::Franka)
+  target_compile_definitions(botop PUBLIC RAI_FRANKA)
+  target_link_libraries(botop PUBLIC Franka::Franka)
+endif()
+
+foreach(drv ROBOTIQ OMNIBASE OPTITRACK)
+  if(USE_${drv})
+    target_compile_definitions(botop PUBLIC RAI_${drv})
+  endif()
+endforeach()
+
+################################################################################
+## botop_skills: motion/control/perception helpers that use BotOp; #include <skills/...>
+
+if(BUILD_SKILLS)
+  file(GLOB SRC_skills skills/*/*.cpp)
+  add_library(botop_skills SHARED ${SRC_skills})
+  target_include_directories(botop_skills PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(botop_skills PUBLIC botop)
 endif()
 
 ################################################################################
@@ -206,7 +216,7 @@ if(USE_PYBIND)
     src/BotOp/py-BotOp.cxx
   )
   target_compile_definitions(_robotic PUBLIC RAI_PYBIND)
-  target_link_libraries(_robotic PRIVATE rai)
+  target_link_libraries(_robotic PRIVATE botop)
   target_link_options(_robotic PRIVATE -flto=auto)  # parallel LTO link (pybind11 adds plain -flto)
 
   set(PY_LIB_SITE "${Python_SITEARCH}")
@@ -235,15 +245,18 @@ add_executable(meshTool rai/bin/src_meshTool/main.cpp)
 target_link_libraries(meshTool rai)
 
 add_executable(bot bin/bot/main.cpp)
-target_link_libraries(bot rai)
+target_link_libraries(bot botop)
 
 if(BUILD_TESTS)
+  if(NOT BUILD_SKILLS)
+    message(FATAL_ERROR "[botop] BUILD_TESTS needs BUILD_SKILLS=ON")
+  endif()
   file(GLOB tests test/examples/*/main.cpp)
   foreach(file ${tests})
     get_filename_component(path ${file} DIRECTORY)
     get_filename_component(name ${path} NAME)
     add_executable(test_${name} ${file})
-    target_link_libraries(test_${name} rai)
+    target_link_libraries(test_${name} botop_skills)
     set_target_properties(test_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${path})
   endforeach()
 endif()
@@ -272,5 +285,10 @@ install(
   PATTERN "*retired*" EXCLUDE
   )
 
-install(TARGETS rai DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+if(BUILD_SKILLS)
+  install(DIRECTORY skills DESTINATION ${CMAKE_INSTALL_PREFIX}/include/rai FILES_MATCHING PATTERN "*.h")
+  install(TARGETS botop_skills DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+endif()
+
+install(TARGETS rai botop DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(TARGETS kinEdit meshTool bot DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

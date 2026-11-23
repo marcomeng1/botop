@@ -4,7 +4,7 @@
 #include <KOMO/pathTools.h>
 
 #include <BotOp/bot.h>
-#include <BotOp/motionHelpers.h>
+#include <KOMO/motionHelpers.h>
 #include <OptiTrack/optitrack.h>
 
 //===========================================================================

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bot.h"
+#include <BotOp/bot.h>
 #include <Control/SecMPC.h>
 
 //===========================================================================

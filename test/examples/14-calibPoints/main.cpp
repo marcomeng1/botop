@@ -4,10 +4,11 @@
 #include <KOMO/pathTools.h>
 
 #include <BotOp/bot.h>
-#include <BotOp/motionHelpers.h>
-#include <BotOp/tools.h>
+#include <KOMO/motionHelpers.h>
+#include <skills/motion/Move_IK.h>
+#include <skills/perception/senseHsvBlob.h>
 
-#include <MarkerVision/cvTools.h>
+#include <Perception/cvTools.h>
 #include <Gui/opengl.h>
 #include <Geo/depth2PointCloud.h>
 

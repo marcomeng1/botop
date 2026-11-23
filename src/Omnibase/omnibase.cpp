@@ -1,6 +1,12 @@
 #include "omnibase.h"
 #include "SimplexMotion.h"
 
+#include <BotOp/drivers.h>
+
+static botop::RegisterArm _registerOmnibase("omnibase_world", [](Var<rai::CtrlCmdMsg>& cmd, Var<rai::CtrlStateMsg>& state, uint robotID, const rai::Configuration& C, char side){
+  return std::make_shared<OmnibaseThread>(cmd, state, robotID, uintA{0,1,2});
+}, false);
+
 #ifdef RAI_OMNIBASE
 
 #define USE_FAKE

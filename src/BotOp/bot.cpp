@@ -1,6 +1,5 @@
 #include "bot.h"
 
-#include <Franka/help.h>
 #include <Kin/F_qFeatures.h>
 #include <Kin/viewer.h>
 #include <KOMO/pathTools.h>
@@ -9,14 +8,11 @@
 #include <Gui/opengl.h>
 #include <Geo/depth2PointCloud.h>
 
-#include <Franka/franka.h>
-#include <Franka/FrankaGripper.h>
-#include "simulation.h"
-#include <Omnibase/omnibase.h>
-#include <Robotiq/RobotiqGripper.h>
+#include "drivers.h"
+#include <Sim/simulation.h>
 #include <OptiTrack/optitrack.h>
 #include <RealSense/RealSenseThread.h>
-#include <MarkerVision/ArucoThread.h>
+#include <Perception/ArucoThread.h>
 #ifdef RAI_VIVE
 #  include <ViveController/vivecontroller.h>
 #endif
@@ -40,64 +36,49 @@ BotOp::BotOp(rai::Configuration& C, bool useRealRobot){
     useRealRobot=false;
   }
 
-  //-- launch robots & grippers
+  //-- launch robots & grippers: drivers are chosen by frame names in the model (see drivers.h)
   if(useRealRobot && useGripper){
-    LOG(0) <<"CONNECTING TO GRIPPERS";
-    try{
-      if(C.getFrame("l_panda_finger_joint1", false) && C.getFrame("r_panda_finger_joint1", false)){
-        gripperL = make_shared<FrankaGripper>(0);
-        gripperR = make_shared<FrankaGripper>(1);
-      }else if(C.getFrame("l_panda_finger_joint1", false)){
-        gripperL = make_shared<FrankaGripper>(0);
-      }else if(C.getFrame("r_panda_finger_joint1", false)){
-        gripperR = make_shared<FrankaGripper>(1);
-
-      }else if(C.getFrame("l_robotiq_base", false) && C.getFrame("r_robotiq_base", false)){
-        gripperL = make_shared<RobotiqGripper>(0);
-        gripperR = make_shared<RobotiqGripper>(1);
-      }else if(C.getFrame("l_robotiq_base", false)){
-        gripperL = make_shared<RobotiqGripper>(0);
-      }else if(C.getFrame("r_robotiq_base", false)){
-        gripperR = make_shared<RobotiqGripper>(1);
+    for(char side : {'l', 'r'}){
+      std::shared_ptr<rai::GripperAbstraction>& gripper = (side=='l' ? gripperL : gripperR);
+      for(botop::GripperDriver& d : botop::gripperDrivers()){
+        rai::String frame = STRING(side <<'_' <<d.frame);
+        if(!C.getFrame(frame, false)) continue;
+        if(gripper){ LOG(-1) <<"more than one gripper driver matches side '" <<side <<"' -- ignoring '" <<frame <<"'"; continue; }
+        LOG(0) <<"CONNECTING TO GRIPPER '" <<frame <<"'";
+        try{
+          gripper = d.create(side=='l' ? 0 : 1);
+        } catch(const std::exception& ex) {
+          LOG(-1) <<"Starting the gripper '" <<frame <<"' failed! Error msg: " <<ex.what();
+        }
       }
-    } catch(const std::exception& ex) {
-      LOG(-1) <<"Starting the gripper(s) failed! Error msg: " <<ex.what();
     }
-    
-    if(!gripperL && !gripperR){
-      LOG(0) <<"WARNING: no grippers created (no frames l_panda_finger_joint1 or l_robotiq_base found in config)";
-    }
+    if(!gripperL && !gripperR) LOG(0) <<"WARNING: no grippers created";
   }
 
   if(useRealRobot){
-    uint robotID=0;
-    LOG(0) <<"CONNECTING TO FRANKAS";
-    try{
-      if(C.getFrame("l_panda_base", false) && C.getFrame("r_panda_base", false)){
-        robotL = make_shared<FrankaThread>(cmd, state, robotID++, franka_getJointIndices(C,'l'));
-        robotR = make_shared<FrankaThread>(cmd, state, robotID++, franka_getJointIndices(C,'r'));
-      } else if(C.getFrame("l_panda_base", false)){
-        robotL = make_shared<FrankaThread>(cmd, state, robotID++, franka_getJointIndices(C,'l'));
-      } else if(C.getFrame("r_panda_base", false)){
-        robotR = make_shared<FrankaThread>(cmd, state, robotID++, franka_getJointIndices(C,'r'));
-      }else{
-        LOG(0) <<"starting botop without franka robots (no frames l_panda_base or r_panda_base defined)";
+    //sided drivers (l_/r_) first, so that drivers without side take the remaining slot
+    for(bool sided : {true, false}){
+      for(botop::ArmDriver& d : botop::armDrivers()){
+        if(d.sided!=sided) continue;
+        uint robotID=0;
+        for(char side : (sided ? std::vector<char>{'l', 'r'} : std::vector<char>{0})){
+          rai::String frame = sided ? STRING(side <<'_' <<d.frame) : d.frame;
+          if(!C.getFrame(frame, false)) continue;
+          std::shared_ptr<rai::RobotAbstraction>& robot = (side=='r' || (!side && robotL)) ? robotR : robotL;
+          if(robot){ LOG(-1) <<"no free robot slot for '" <<frame <<"' -- ignoring"; continue; }
+          LOG(0) <<"CONNECTING TO ROBOT '" <<frame <<"'";
+          try{
+            robot = d.create(cmd, state, robotID++, C, side);
+          } catch(const std::exception& ex) {
+            LOG(-1) <<"Starting the robot '" <<frame <<"' failed! Error msg: " <<ex.what();
+          } catch(...) {
+            LOG(-1) <<"Starting the robot '" <<frame <<"' failed! Error msg: " <<rai::errString();
+          }
+        }
       }
-      C.setJointState(get_q());
-    } catch(const std::exception& ex) {
-      LOG(-1) <<"Starting the franka robot(s) failed! Error msg: " <<ex.what();
-    } catch(...) {
-      LOG(-1) <<"Starting the franka robot(s) failed! Error msg: " <<rai::errString();
     }
-
-    try{
-      if(C.getFrame("omnibase_world", false)){
-        LOG(0) <<"CONNECTING TO OMNIBASE";
-        robotL = make_shared<OmnibaseThread>(cmd, state, robotID++, uintA{0,1,2});
-      }
-    } catch(const std::exception& ex) {
-      LOG(-1) <<"Starting the omnibase failed! Error msg: " <<ex.what();
-    }
+    if(!robotL && !robotR) LOG(0) <<"starting botop without robots";
+    else C.setJointState(get_q());
 
   }else{
     simthread = make_shared<BotThreadedSim>(C, cmd, state);
@@ -287,49 +268,6 @@ void BotOp::move(const arr& path, const arr& times, bool overwrite, double overw
     //LOG(1) <<"append: " <<ctrlTime <<" - " <<_times;
     getSplineRef()->append(path, /*vels,*/ _times, get_t());
   }
-}
-
-void BotOp::move_oldCubic(const arr& path, const arr& times, bool overwrite, double overwriteCtrlTime){
-  arr _times=times;
-
-
-  if(std::dynamic_pointer_cast<rai::BSplineCtrlReference>(ref)){
-    return move(path, _times, overwrite, overwriteCtrlTime);
-  }
-
-  arr vels;
-  if(path.d0==1){
-    vels = zeros(1, path.d1);
-  }else{ //use timing opt to decide on vels and, optionally, on timing
-    arr q, qDot;
-    if(!overwrite){
-      getSplineRef()->eval(q, qDot, NoArr, getSplineRef()->getEndTime());
-      q = path[0];
-      qDot = zeros(q.N);
-    }else{ //THIS IS STILL BUGGY - need overwriteCtrlTime!!
-      CHECK(overwriteCtrlTime>0., "overwrite -> need to give a cut-time (e.g. start og MPC cycle, or just get_t())");
-      getSplineRef()->eval(q, qDot, NoArr, overwriteCtrlTime);
-    }
-
-    bool optTau = (times.N==0);
-    arr tauInitial = {};
-    if(!optTau) tauInitial = differencing(_times);
-    TimingProblem timingProblem(path, {}, q, qDot, 1., 1., optTau, false, {}, tauInitial);
-    rai::NLP_Solver solver;
-    solver
-        .setProblem(timingProblem.ptr())
-        .setSolver(rai::M_Newton);
-    solver.opt
-        ->set_stopTolerance(1e-4)
-        .set_stepMax(1e0)
-        .set_damping(1e-2);
-    auto ret = solver.solve();
-    //LOG(1) <<"timing f: " <<ret->f;
-    timingProblem.getVels(vels);
-    if(!_times.N) _times = integral(timingProblem.tau);
-  }
-
-  NIY; //move(path, vels, _times, overwrite, overwriteCtrlTime);
 }
 
 void BotOp::moveAutoTimed(const arr& path, double maxVel, double maxAcc){

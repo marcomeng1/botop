@@ -1,5 +1,11 @@
 #include "RobotiqGripper.h"
 
+#include <BotOp/drivers.h>
+
+static botop::RegisterGripper _registerRobotiq("robotiq_base", [](uint whichRobot){
+  return std::make_shared<RobotiqGripper>(whichRobot);
+});
+
 #ifdef RAI_ROBOTIQ
 
 #include <cstdint>
@@ -19,7 +25,6 @@ const double MAX_SPEED = 0.15; // in  mm/s
 static int msg_len=0;
 static uint8_t msg[301];
 
-const char *robotiqSerialPorts[2] = {"/dev/ttyUSB0", "/dev/ttyUSB1"};
 
 void writeHex(uint8_t *msg, int len){
   cout <<"\nSERIAL MSG: ";
@@ -72,7 +77,10 @@ RobotiqGripper::RobotiqGripper(uint whichRobot) {
   boost::asio::io_service io;
   serialPort = std::make_shared<boost::asio::serial_port>(io);
 
-  serialPort->open(robotiqSerialPorts[whichRobot]);
+  rai::String key = STRING("Robotiq/port" <<whichRobot);
+  rai::String port = rai::getParameter<rai::String>(key.p, STRING("/dev/ttyUSB" <<whichRobot));
+  LOG(0) <<"launching RobotiqGripper " <<whichRobot <<" at " <<port;
+  serialPort->open(port.p);
 
   serialPort->set_option(boost::asio::serial_port_base::baud_rate(115200));
   serialPort->set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));

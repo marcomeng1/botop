@@ -1,17 +1,23 @@
 #include "FrankaGripper.h"
+#include "franka.h"
+
+#include <BotOp/drivers.h>
+
+static botop::RegisterGripper _registerFrankaGripper("panda_finger_joint1", [](uint whichRobot){
+  return std::make_shared<FrankaGripper>(whichRobot);
+});
 
 #ifdef RAI_FRANKA
 
 #include <franka/gripper.h>
 
-const char *gripperIpAddresses[2] = {"172.16.0.2", "172.17.0.2"};
-
 FrankaGripper::FrankaGripper(uint whichRobot)
   : Thread(STRING("FrankaGripper_"<<whichRobot)) {
   //-- choose robot/ipAddress
-  CHECK_LE(whichRobot, 1, "");
-  LOG(0) <<"launching FrankaGripper " <<whichRobot <<" at " <<gripperIpAddresses[whichRobot];
-  frankaGripper = make_shared<franka::Gripper>(gripperIpAddresses[whichRobot]);
+  rai::String ipAddress = franka_ipAddress(whichRobot);
+  CHECK(ipAddress.N, "no IP address for FrankaGripper " <<whichRobot <<" -- set Franka/ip" <<whichRobot <<" in rai.cfg");
+  LOG(0) <<"launching FrankaGripper " <<whichRobot <<" at " <<ipAddress;
+  frankaGripper = make_shared<franka::Gripper>(ipAddress.p);
   franka::GripperState gripper_state = frankaGripper->readOnce();
   maxWidth = gripper_state.max_width;
   LOG(0) <<"gripper max width:" <<maxWidth;
