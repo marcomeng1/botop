@@ -173,9 +173,8 @@ pixi run ./test_10-compliant -real false   # simulation; press 'q' in the viewer
 ```
 
 Command line arguments `-<key> <value>` override parameters in `rai.cfg`
-(e.g. `-real false`, `-bot/useGripper false`). Examples that currently build:
-01-openClose, 02-camera, 02-optitrack, 03-blobTracking, 10-compliant,
-12-controlCalib, 15-arucoSystem; the others need updating to the current rai API.
+(e.g. `-real false`, `-bot/useGripper false`). All examples build; see
+[test/examples/README.md](test/examples/README.md) for what each one does.
 
 ## Layout
 
@@ -186,7 +185,7 @@ Command line arguments `-<key> <value>` override parameters in `rai.cfg`
 | `src/<driver>/` | hardware drivers: Franka, Robotiq, Omnibase, RealSense, OptiTrack, Audio |
 | `skills/` | helpers on top of BotOp (`libbotop_skills`, `-DBUILD_SKILLS`): `motion/Move_IK`, `control/SecMPC_Stepper`, `perception/senseHsvBlob`; include as `<skills/...>` |
 | `bin/bot/` | `bot` command line tool, minimal BotOp example |
-| `test/examples/` | C++ examples; build with `-DBUILD_TESTS=ON` (several need updating to the current rai API) |
+| `test/examples/` | C++ examples; build with `-DBUILD_TESTS=ON` (overview in its README) |
 | `test/py/` | Python smoke test |
 | `rai/` | submodule: core algorithms (kinematics, KOMO, optimization, perception, ...); generic helpers formerly in botop live here: `KOMO/motionHelpers.h`, `Perception/ArucoThread.h`, `Perception/cvTools.h` |
 | `rai-robotModels/` | submodule: robot and scene models |
