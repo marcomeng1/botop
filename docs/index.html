@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BotOp — an illustrated introduction</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#1d2330; --muted:#5d6678; --line:#d9dee7;
+    --blue:#2f6fde; --blue-l:#e6eefc; --green:#1f9d6b; --green-l:#e3f5ed;
+    --orange:#e07b16; --orange-l:#fdf0e2; --purple:#7a4fd0; --purple-l:#efe9fb;
+    --red:#d24a4a; --red-l:#fbe7e7; --gray-l:#eef0f4;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--blue)}
+  code{font-family:var(--mono);font-size:.9em;background:var(--gray-l);padding:.1em .35em;border-radius:4px}
+  pre{font-family:var(--mono);font-size:13.5px;line-height:1.5;background:#1e2430;color:#e6e9ef;padding:16px 18px;border-radius:10px;overflow:auto;margin:0}
+  pre .c{color:#8a94a8} pre .k{color:#7fb4ff} pre .s{color:#9fd88b} pre .f{color:#f3c178}
+  nav{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+  nav .in{max-width:1100px;margin:auto;display:flex;gap:18px;padding:10px 24px;overflow-x:auto;white-space:nowrap;font-size:14px}
+  nav a{text-decoration:none;color:var(--muted)} nav a:hover{color:var(--blue)}
+  nav b{color:var(--ink);margin-right:8px}
+  header{background:linear-gradient(135deg,#1f3b73,#2f6fde 60%,#5b8ff0);color:#fff}
+  header .in{max-width:1100px;margin:auto;padding:56px 24px 48px}
+  header h1{margin:0 0 8px;font-size:44px;letter-spacing:-.5px}
+  header p{margin:0;max-width:760px;font-size:19px;opacity:.95}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+  .pill{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:4px 12px;border-radius:999px;font-size:14px}
+  main{max-width:1100px;margin:auto;padding:8px 24px 64px}
+  section{margin-top:48px}
+  h2{font-size:28px;margin:0 0 6px;letter-spacing:-.3px}
+  h2 small{display:block;font-size:15px;font-weight:400;color:var(--muted);letter-spacing:0;margin-top:2px}
+  h3{margin:0 0 6px;font-size:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin-top:16px;box-shadow:0 1px 2px rgba(20,30,50,.04)}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .muted{color:var(--muted)}
+  svg{display:block;width:100%;height:auto}
+  svg text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  svg .mono{font-family:var(--mono)}
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff}
+  .toggle button{border:0;background:none;padding:7px 16px;font:inherit;font-size:14px;cursor:pointer;color:var(--muted)}
+  .toggle button.on{background:var(--blue);color:#fff}
+  .layer{transition:opacity .25s}
+  .dim{opacity:.18}
+  .tabs{display:flex;gap:6px;margin-bottom:-1px}
+  .tabs button{border:1px solid var(--line);border-bottom:0;background:var(--gray-l);padding:6px 14px;border-radius:8px 8px 0 0;font:inherit;font-size:14px;cursor:pointer;color:var(--muted)}
+  .tabs button.on{background:#1e2430;color:#fff;border-color:#1e2430}
+  .hidden{display:none}
+  table{border-collapse:collapse;width:100%;font-size:14.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  #exTable td:first-child{white-space:nowrap}
+  .card h3{overflow-wrap:anywhere}
+  th{color:var(--muted);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.4px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;font-weight:600}
+  .t-sim{background:var(--green-l);color:var(--green)}
+  .t-hw{background:var(--orange-l);color:var(--orange)}
+  .map{display:grid;grid-template-columns:310px 1fr;gap:18px}
+  @media(max-width:760px){.map{grid-template-columns:1fr}}
+  .tree{font-family:var(--mono);font-size:14px;line-height:1.9}
+  .tree div{cursor:pointer;padding:0 8px;border-radius:6px}
+  .tree div:hover,.tree div.on{background:var(--blue-l);color:var(--blue)}
+  .tree .i1{padding-left:26px}
+  .detail{background:var(--gray-l);border-radius:10px;padding:18px;min-height:180px}
+  .detail h3 code{font-size:16px}
+  .step{display:flex;gap:14px;align-items:flex-start}
+  .num{flex:0 0 30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .kbd{font-family:var(--mono);font-size:13px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;background:#fff}
+  footer{max-width:1100px;margin:auto;padding:24px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<nav><div class="in">
+  <b>BotOp</b>
+  <a href="#idea">Idea</a>
+  <a href="#arch">Architecture</a>
+  <a href="#motion">Motion</a>
+  <a href="#loop">Main loop</a>
+  <a href="#closed">Closed loop</a>
+  <a href="#drivers">Drivers</a>
+  <a href="#repo">Repo map</a>
+  <a href="#build">Build</a>
+  <a href="#start">Quick start</a>
+  <a href="#examples">Examples</a>
+</div></nav>
+
+<header><div class="in">
+  <h1>BotOp</h1>
+  <p>The robot operation layer of the <a style="color:#fff" href="https://argmin.lis.tu-berlin.de/">LIS lab</a>:
+  one small C++/Python interface that drives <b>real robots</b> (Franka Panda, Robotiq, RealSense, OptiTrack)
+  or a <b>PhysX simulation</b> of any model, with exactly the same code.</p>
+  <div class="pills">
+    <span class="pill">C++ &amp; Python (<code style="background:none;color:#fff">import robotic</code>)</span>
+    <span class="pill">spline-based motion</span>
+    <span class="pill">sim ⇄ real with one flag</span>
+    <span class="pill">open-loop plans or closed-loop vision → control</span>
+    <span class="pill">built on rai (KOMO, kinematics)</span>
+    <span class="pill">reproducible build with pixi</span>
+  </div>
+</div></header>
+
+<main>
+
+<!-- ============================================================ IDEA -->
+<section id="idea">
+  <h2>The idea in one picture<small>You plan in your own model of the world; BotOp makes the robot (or the simulator) follow.</small></h2>
+  <div class="card">
+    <svg viewBox="0 0 1040 230" role="img" aria-label="Plan in C, command BotOp, robot executes, state flows back into C">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#5d6678"/></marker>
+        <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2f6fde"/></marker>
+        <marker id="arG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#1f9d6b"/></marker>
+      </defs>
+      <!-- C -->
+      <rect x="10" y="40" width="250" height="130" rx="14" fill="#efe9fb" stroke="#7a4fd0"/>
+      <text x="135" y="72" text-anchor="middle" font-weight="700" fill="#7a4fd0" font-size="17">Your model  C</text>
+      <text x="135" y="96" text-anchor="middle" font-size="13.5" fill="#1d2330">rai::Configuration / ry.Config</text>
+      <text x="135" y="120" text-anchor="middle" font-size="13.5" fill="#5d6678">robot + scene from a .g file</text>
+      <text x="135" y="142" text-anchor="middle" font-size="13.5" fill="#5d6678">plan with KOMO, IK, RRT …</text>
+      <!-- BotOp -->
+      <rect x="395" y="40" width="250" height="130" rx="14" fill="#e6eefc" stroke="#2f6fde" stroke-width="2"/>
+      <text x="520" y="72" text-anchor="middle" font-weight="700" fill="#2f6fde" font-size="17">BotOp  bot(C, real)</text>
+      <text x="520" y="98" text-anchor="middle" font-size="13.5" class="mono">move · moveTo · gripper*</text>
+      <text x="520" y="120" text-anchor="middle" font-size="13.5" class="mono">getImageAndDepth</text>
+      <text x="520" y="142" text-anchor="middle" font-size="13.5" class="mono">sync · wait · home</text>
+      <!-- robot -->
+      <rect x="780" y="20" width="250" height="78" rx="14" fill="#fdf0e2" stroke="#e07b16"/>
+      <text x="905" y="52" text-anchor="middle" font-weight="700" fill="#e07b16" font-size="16">Real robot</text>
+      <text x="905" y="76" text-anchor="middle" font-size="13" fill="#5d6678">Franka · Robotiq · RealSense</text>
+      <rect x="780" y="112" width="250" height="78" rx="14" fill="#e3f5ed" stroke="#1f9d6b"/>
+      <text x="905" y="144" text-anchor="middle" font-weight="700" fill="#1f9d6b" font-size="16">Simulation</text>
+      <text x="905" y="168" text-anchor="middle" font-size="13" fill="#5d6678">PhysX, any model</text>
+      <!-- arrows -->
+      <path d="M262,85 H390" stroke="#2f6fde" stroke-width="2.5" marker-end="url(#arB)" fill="none"/>
+      <text x="326" y="76" text-anchor="middle" font-size="13" fill="#2f6fde">path / q_target</text>
+      <path d="M390,128 H264" stroke="#1f9d6b" stroke-width="2.5" marker-end="url(#arG)" fill="none"/>
+      <text x="326" y="148" text-anchor="middle" font-size="13" fill="#1f9d6b">q, images (sync)</text>
+      <path d="M647,90 C710,90 715,60 776,60" stroke="#5d6678" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+      <path d="M647,122 C710,122 715,150 776,150" stroke="#5d6678" stroke-width="2" marker-end="url(#ar)" fill="none" stroke-dasharray="6 4"/>
+      <text x="712" y="112" text-anchor="middle" font-size="12.5" fill="#5d6678">either / or</text>
+      <text x="520" y="212" text-anchor="middle" font-size="14" fill="#5d6678">The robot never reads C directly: C is your copy, refreshed by <tspan class="mono">bot.sync(C)</tspan> / <tspan class="mono">bot.wait(C)</tspan>.</text>
+    </svg>
+  </div>
+  <div class="grid g3" style="margin-top:16px">
+    <div class="card" style="margin:0"><h3>🧭 Commands are splines</h3><span class="muted">You send waypoints (+ timing). BotOp turns them into a smooth cubic spline that a fast controller tracks. Calls return immediately.</span></div>
+    <div class="card" style="margin:0"><h3>🔁 Sim and real are the same API</h3><span class="muted"><code>BotOp(C, false)</code> starts a PhysX simulation thread; <code>BotOp(C, true)</code> connects the drivers. Your script does not change.</span></div>
+    <div class="card" style="margin:0"><h3>🧩 Hardware chosen by the model</h3><span class="muted">Drivers are picked from frame names in the <code>.g</code> file (<code>l_panda_base</code> → Franka, <code>l_robotiq_base</code> → Robotiq, …).</span></div>
+  </div>
+</section>
+
+<!-- ============================================================ ARCHITECTURE -->
+<section id="arch">
+  <h2>Architecture<small>Threads and data inside <code>BotOp</code>. Switch between simulation and real hardware to see what changes.</small></h2>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <div class="toggle" id="modeToggle">
+        <button data-mode="both" class="on">both</button>
+        <button data-mode="sim">useRealRobot = false</button>
+        <button data-mode="real">useRealRobot = true</button>
+      </div>
+      <span class="muted" style="font-size:14px">everything above the dashed line is identical in both modes</span>
+    </div>
+    <svg viewBox="0 0 1040 560" role="img" aria-label="BotOp architecture">
+      <!-- user layer -->
+      <rect x="20" y="10" width="1000" height="70" rx="12" fill="#f4f5f8" stroke="#d9dee7"/>
+      <text x="40" y="38" font-weight="700" font-size="15">Your program</text>
+      <text x="40" y="62" font-size="13.5" fill="#5d6678">C++ (<tspan class="mono">#include &lt;BotOp/bot.h&gt;</tspan>)  or  Python (<tspan class="mono">ry.BotOp</tspan>, via the pybind11 module <tspan class="mono">robotic._robotic</tspan>)</text>
+      <rect x="720" y="22" width="285" height="46" rx="10" fill="#efe9fb" stroke="#7a4fd0"/>
+      <text x="862" y="50" text-anchor="middle" font-size="13.5" fill="#7a4fd0" font-weight="600">model C  (+ viewer window)</text>
+
+      <!-- BotOp box -->
+      <rect x="20" y="100" width="1000" height="200" rx="14" fill="#e6eefc" stroke="#2f6fde" stroke-width="2"/>
+      <text x="40" y="128" font-weight="700" font-size="16" fill="#2f6fde">BotOp</text>
+      <text x="100" y="128" font-size="13" fill="#5d6678">src/BotOp/bot.{h,cpp}</text>
+
+      <rect x="40" y="145" width="225" height="135" rx="10" fill="#fff" stroke="#9fb9ee"/>
+      <text x="152" y="168" text-anchor="middle" font-weight="600" font-size="14">motion commands</text>
+      <text x="56" y="192" font-size="12.5" class="mono">move(path, times)</text>
+      <text x="56" y="212" font-size="12.5" class="mono">moveAutoTimed(path)</text>
+      <text x="56" y="232" font-size="12.5" class="mono">moveTo(q, timeCost)</text>
+      <text x="56" y="252" font-size="12.5" class="mono">hold · setCompliance</text>
+      <text x="56" y="272" font-size="12.5" class="mono">stepAction</text>
+
+      <rect x="285" y="145" width="250" height="135" rx="10" fill="#fff" stroke="#9fb9ee"/>
+      <text x="410" y="168" text-anchor="middle" font-weight="600" font-size="14">reference  (ReferenceFeed)</text>
+      <path d="M305,250 C340,250 345,195 380,195 S420,240 455,225 S495,190 515,192" stroke="#2f6fde" stroke-width="3" fill="none"/>
+      <circle cx="305" cy="250" r="4.5" fill="#2f6fde"/><circle cx="380" cy="195" r="4.5" fill="#2f6fde"/>
+      <circle cx="455" cy="225" r="4.5" fill="#2f6fde"/><circle cx="515" cy="192" r="4.5" fill="#2f6fde"/>
+      <text x="410" y="272" text-anchor="middle" font-size="12.5" fill="#5d6678">BSpline  · or ZeroReference (hold/float)</text>
+
+      <rect x="555" y="145" width="215" height="135" rx="10" fill="#fff" stroke="#9fb9ee"/>
+      <text x="662" y="168" text-anchor="middle" font-weight="600" font-size="14">shared variables</text>
+      <rect x="565" y="182" width="195" height="36" rx="7" fill="#e6eefc" stroke="#2f6fde"/>
+      <text x="662" y="205" text-anchor="middle" font-size="12" class="mono">Var&lt;CtrlCmdMsg&gt; cmd</text>
+      <rect x="565" y="228" width="195" height="36" rx="7" fill="#e3f5ed" stroke="#1f9d6b"/>
+      <text x="662" y="251" text-anchor="middle" font-size="12" class="mono">Var&lt;CtrlStateMsg&gt; state</text>
+
+      <rect x="790" y="145" width="215" height="135" rx="10" fill="#fff" stroke="#9fb9ee"/>
+      <text x="897" y="168" text-anchor="middle" font-weight="600" font-size="14">sensing &amp; sync</text>
+      <text x="806" y="192" font-size="12.5" class="mono">get_q · get_t</text>
+      <text x="806" y="212" font-size="12.5" class="mono">getTimeToEnd</text>
+      <text x="806" y="232" font-size="12.5" class="mono">getImageDepthPcl</text>
+      <text x="806" y="252" font-size="12.5" class="mono">sync(C) · wait(C)</text>
+      <text x="806" y="272" font-size="12.5" class="mono">gripperDone</text>
+
+      <path d="M265,212 H281" stroke="#2f6fde" stroke-width="2" marker-end="url(#arB)"/>
+      <path d="M535,200 H561" stroke="#2f6fde" stroke-width="2" marker-end="url(#arB)"/>
+      <path d="M760,246 H786" stroke="#1f9d6b" stroke-width="2" marker-end="url(#arG)"/>
+      <path d="M862,80 V97" stroke="#1f9d6b" stroke-width="2" marker-end="url(#arG)"/>
+      <path d="M300,80 V97" stroke="#2f6fde" stroke-width="2" marker-end="url(#arB)"/>
+
+      <line x1="20" y1="320" x2="1020" y2="320" stroke="#5d6678" stroke-dasharray="8 6"/>
+      <text x="30" y="314" font-size="12.5" fill="#5d6678">threads started by the BotOp constructor ↓</text>
+
+      <!-- SIM layer -->
+      <g class="layer" id="layerSim">
+        <rect x="20" y="335" width="490" height="215" rx="14" fill="#e3f5ed" stroke="#1f9d6b" stroke-width="2"/>
+        <text x="40" y="362" font-weight="700" font-size="15" fill="#1f9d6b">Simulation  (useRealRobot = false)</text>
+        <rect x="40" y="378" width="450" height="64" rx="10" fill="#fff" stroke="#8fd1b6"/>
+        <text x="56" y="402" font-weight="600" font-size="14">BotThreadedSim</text>
+        <text x="56" y="426" font-size="12.5" fill="#5d6678">src/Sim · PhysX step every botsim/tau = 10 ms</text>
+        <rect x="40" y="452" width="215" height="80" rx="10" fill="#fff" stroke="#8fd1b6"/>
+        <text x="56" y="476" font-weight="600" font-size="14">GripperSim</text>
+        <text x="56" y="498" font-size="12.5" fill="#5d6678">frame l_gripper</text>
+        <text x="56" y="518" font-size="12.5" fill="#5d6678">open / close / grasp</text>
+        <rect x="275" y="452" width="215" height="80" rx="10" fill="#fff" stroke="#8fd1b6"/>
+        <text x="291" y="476" font-weight="600" font-size="14">CameraSimThread</text>
+        <text x="291" y="498" font-size="12.5" fill="#5d6678">renders any camera frame</text>
+        <text x="291" y="518" font-size="12.5" fill="#5d6678">rgb + depth</text>
+      </g>
+
+      <!-- REAL layer -->
+      <g class="layer" id="layerReal">
+        <rect x="530" y="335" width="490" height="215" rx="14" fill="#fdf0e2" stroke="#e07b16" stroke-width="2"/>
+        <text x="550" y="362" font-weight="700" font-size="15" fill="#e07b16">Real hardware  (useRealRobot = true, env hw)</text>
+        <rect x="550" y="378" width="215" height="64" rx="10" fill="#fff" stroke="#f2bf8c"/>
+        <text x="566" y="402" font-weight="600" font-size="14">FrankaThread ×1–2</text>
+        <text x="566" y="426" font-size="12.5" fill="#5d6678">libfranka, 1 kHz torque ctrl</text>
+        <rect x="785" y="378" width="215" height="64" rx="10" fill="#fff" stroke="#f2bf8c"/>
+        <text x="801" y="402" font-weight="600" font-size="14">OmnibaseThread</text>
+        <text x="801" y="426" font-size="12.5" fill="#5d6678">mobile base (optional)</text>
+        <rect x="550" y="452" width="140" height="80" rx="10" fill="#fff" stroke="#f2bf8c"/>
+        <text x="566" y="476" font-weight="600" font-size="14">Grippers</text>
+        <text x="566" y="498" font-size="12.5" fill="#5d6678">Robotiq or</text>
+        <text x="566" y="518" font-size="12.5" fill="#5d6678">Franka hand</text>
+        <rect x="705" y="452" width="140" height="80" rx="10" fill="#fff" stroke="#f2bf8c"/>
+        <text x="721" y="476" font-weight="600" font-size="14">RealSense</text>
+        <text x="721" y="498" font-size="12.5" fill="#5d6678">RealSenseThread</text>
+        <text x="721" y="518" font-size="12.5" fill="#5d6678">per camera</text>
+        <rect x="860" y="452" width="140" height="80" rx="10" fill="#fff" stroke="#f2bf8c"/>
+        <text x="876" y="476" font-weight="600" font-size="14">OptiTrack</text>
+        <text x="876" y="498" font-size="12.5" fill="#5d6678">mocap → frames</text>
+        <text x="876" y="518" font-size="12.5" fill="#5d6678">in C (optional)</text>
+      </g>
+
+      <path d="M620,300 C620,318 430,314 430,331" stroke="#2f6fde" stroke-width="2" fill="none" marker-end="url(#arB)" class="layer" id="aSim"/>
+      <path d="M705,300 C705,318 930,314 930,331" stroke="#2f6fde" stroke-width="2" fill="none" marker-end="url(#arB)" class="layer" id="aReal"/>
+    </svg>
+    <p class="muted" style="margin:10px 0 0;font-size:14.5px">Each tick, the robot thread asks the reference for <code>q_ref, qDot_ref</code> at the current control time,
+      tracks it, and writes the measured <code>q, qDot</code> into <code>state</code>. Your program only touches the reference and reads the state.</p>
+  </div>
+</section>
+
+<!-- ============================================================ MOTION -->
+<section id="motion">
+  <h2>How a motion command works<small>All motion commands end up as one cubic spline in the reference buffer.</small></h2>
+  <div class="card">
+    <div class="toggle" id="ovToggle" style="margin-bottom:8px">
+      <button data-ov="append" class="on">append (default)</button>
+      <button data-ov="overwrite">overwrite = true</button>
+    </div>
+    <svg viewBox="0 0 1040 300" role="img" aria-label="spline timeline">
+      <line x1="50" y1="250" x2="1010" y2="250" stroke="#5d6678" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="1010" y="275" text-anchor="end" font-size="13" fill="#5d6678">control time  get_t()</text>
+      <line x1="50" y1="30" x2="50" y2="250" stroke="#5d6678" stroke-width="1.5"/>
+      <text x="58" y="40" font-size="13" fill="#5d6678">joint q</text>
+      <!-- past (executed) -->
+      <path d="M50,200 C120,200 150,120 230,120 S330,170 380,165" stroke="#9aa3b5" stroke-width="4" fill="none"/>
+      <!-- now -->
+      <line x1="380" y1="30" x2="380" y2="250" stroke="#d24a4a" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="380" y="268" text-anchor="middle" font-size="13" fill="#d24a4a" font-weight="600">now</text>
+      <!-- remaining old -->
+      <g id="oldRest">
+        <path d="M380,165 C430,160 470,90 560,90" stroke="#2f6fde" stroke-width="4" fill="none"/>
+        <circle cx="560" cy="90" r="6" fill="#2f6fde"/>
+        <text x="470" y="72" text-anchor="middle" font-size="13" fill="#2f6fde">still queued</text>
+        <line x1="560" y1="90" x2="560" y2="250" stroke="#2f6fde" stroke-dasharray="3 4"/>
+        <text x="560" y="268" text-anchor="middle" font-size="12.5" fill="#2f6fde">end of buffer</text>
+      </g>
+      <g id="oldRestDim" class="hidden">
+        <path d="M380,165 C430,160 470,90 560,90" stroke="#2f6fde" stroke-width="3" fill="none" stroke-dasharray="4 5" opacity=".35"/>
+        <text x="500" y="72" text-anchor="middle" font-size="13" fill="#9aa3b5">discarded</text>
+      </g>
+      <!-- new appended -->
+      <g id="newAppend">
+        <path d="M560,90 C640,90 660,210 760,210 S900,60 980,70" stroke="#1f9d6b" stroke-width="4" fill="none"/>
+        <circle cx="760" cy="210" r="6" fill="#1f9d6b"/><circle cx="980" cy="70" r="6" fill="#1f9d6b"/>
+        <text x="830" y="240" text-anchor="middle" font-size="13" fill="#1f9d6b">new path, starts where the old one ends</text>
+      </g>
+      <g id="newOver" class="hidden">
+        <path d="M380,165 C450,170 520,215 620,210 S800,70 880,75" stroke="#1f9d6b" stroke-width="4" fill="none"/>
+        <circle cx="620" cy="210" r="6" fill="#1f9d6b"/><circle cx="880" cy="75" r="6" fill="#1f9d6b"/>
+        <text x="700" y="240" text-anchor="middle" font-size="13" fill="#1f9d6b">new path takes over smoothly from now (reactive / MPC style)</text>
+      </g>
+      <text x="200" y="100" text-anchor="middle" font-size="13" fill="#9aa3b5">already executed</text>
+    </svg>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card" style="margin:0">
+      <h3>Which command when?</h3>
+      <table>
+        <tr><th>call</th><th>use it when</th></tr>
+        <tr><td><code>moveTo(q, timeCost)</code></td><td>one target pose; duration is optimized (higher <code>timeCost</code> = faster)</td></tr>
+        <tr><td><code>move(path, {T})</code></td><td>a path whose total duration <code>T</code> you know (waypoints equally spaced)</td></tr>
+        <tr><td><code>move(path, times)</code></td><td>you know the time of every waypoint</td></tr>
+        <tr><td><code>moveAutoTimed(path, vMax, aMax)</code></td><td>a fine path (e.g. from KOMO); duration chosen from velocity/acceleration limits</td></tr>
+        <tr><td><code>hold(float, damp)</code></td><td>no spline: hold position, float under gravity compensation, or damp</td></tr>
+      </table>
+    </div>
+    <div class="card" style="margin:0">
+      <h3>What happens inside</h3>
+      <div class="step"><div class="num">1</div><div>Missing timing and waypoint velocities are filled in by a small timing optimization (<code>rai/Control/timingOpt</code>).</div></div>
+      <div class="step" style="margin-top:10px"><div class="num">2</div><div>The result is appended to (or overwrites) the <code>BSplineCtrlReference</code>.</div></div>
+      <div class="step" style="margin-top:10px"><div class="num">3</div><div>The control thread evaluates the spline every tick and tracks it (PD + gravity compensation on the Franka; position control in PhysX).</div></div>
+      <div class="step" style="margin-top:10px"><div class="num">4</div><div>The call returned right after step 2: <code>getTimeToEnd() &lt; 0</code> tells you the buffer is empty.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ MAIN LOOP -->
+<section id="loop">
+  <h2>The typical main loop<small>Sense → plan → act, and keep your model in sync while the robot moves.</small></h2>
+  <div class="card">
+    <svg viewBox="0 0 1040 250" role="img" aria-label="sense plan act loop">
+      <g font-size="14">
+        <rect x="30" y="80" width="190" height="90" rx="14" fill="#e3f5ed" stroke="#1f9d6b"/>
+        <text x="125" y="112" text-anchor="middle" font-weight="700" fill="#1f9d6b">1  Sense</text>
+        <text x="125" y="136" text-anchor="middle" font-size="12.5" class="mono">bot.sync(C)</text>
+        <text x="125" y="155" text-anchor="middle" font-size="12.5" class="mono">getImageDepthPcl</text>
+
+        <rect x="290" y="80" width="190" height="90" rx="14" fill="#efe9fb" stroke="#7a4fd0"/>
+        <text x="385" y="112" text-anchor="middle" font-weight="700" fill="#7a4fd0">2  Plan in C</text>
+        <text x="385" y="136" text-anchor="middle" font-size="12.5" class="mono">KOMO komo(C, …)</text>
+        <text x="385" y="155" text-anchor="middle" font-size="12.5" class="mono">path = komo.getPath()</text>
+
+        <rect x="550" y="80" width="190" height="90" rx="14" fill="#e6eefc" stroke="#2f6fde"/>
+        <text x="645" y="112" text-anchor="middle" font-weight="700" fill="#2f6fde">3  Act</text>
+        <text x="645" y="136" text-anchor="middle" font-size="12.5" class="mono">bot.move(path, {T})</text>
+        <text x="645" y="155" text-anchor="middle" font-size="12.5" class="mono">bot.gripperClose(…)</text>
+
+        <rect x="810" y="80" width="200" height="90" rx="14" fill="#fdf0e2" stroke="#e07b16"/>
+        <text x="910" y="112" text-anchor="middle" font-weight="700" fill="#e07b16">4  Wait / watch</text>
+        <text x="910" y="136" text-anchor="middle" font-size="12.5" class="mono">bot.wait(C, …)</text>
+        <text x="910" y="155" text-anchor="middle" font-size="12.5" class="mono">getTimeToEnd()&lt;0</text>
+
+        <path d="M222,125 H285" stroke="#5d6678" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M482,125 H545" stroke="#5d6678" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M742,125 H805" stroke="#5d6678" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M910,172 C910,235 125,235 125,176" stroke="#5d6678" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+        <text x="520" y="228" text-anchor="middle" font-size="13" fill="#5d6678">next phase: attach the grasped object in C, re-plan, repeat (see example 08-pnp)</text>
+        <text x="520" y="40" text-anchor="middle" font-size="13" fill="#5d6678">One plan per phase, executed open-loop. Good for static scenes; for moving targets close the loop (next section).</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- ============================================================ CLOSED LOOP -->
+<section id="closed">
+  <h2>Closed loop: from vision to control<small>Because commands are non-blocking and can overwrite the running spline, the same structure runs perception → control in a continuous loop (visual servoing, tracking, MPC).</small></h2>
+  <div class="card">
+    <svg viewBox="0 0 1040 380" role="img" aria-label="three nested loops: perception, control cycle, robot controller">
+      <defs>
+        <marker id="arP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7a4fd0"/></marker>
+        <marker id="arO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#e07b16"/></marker>
+      </defs>
+      <!-- lane labels -->
+      <g font-size="13">
+        <rect x="10" y="20" width="1020" height="92" rx="12" fill="#f3fbf7" stroke="#cdeadd"/>
+        <rect x="10" y="135" width="1020" height="92" rx="12" fill="#f6f2fd" stroke="#ddd0f5"/>
+        <rect x="10" y="250" width="1020" height="92" rx="12" fill="#fef8f1" stroke="#f6dcc0"/>
+        <text x="26" y="52" font-weight="700" fill="#1f9d6b" font-size="14">Perception</text>
+        <text x="26" y="72" fill="#5d6678">background threads</text>
+        <text x="26" y="90" fill="#5d6678">~ camera frame rate</text>
+        <text x="26" y="167" font-weight="700" fill="#7a4fd0" font-size="14">Your control cycle</text>
+        <text x="26" y="187" fill="#5d6678">your loop, ~10–50 Hz</text>
+        <text x="26" y="205" fill="#5d6678">(e.g. cycleTime .02–.1 s)</text>
+        <text x="26" y="282" font-weight="700" fill="#e07b16" font-size="14">Robot controller</text>
+        <text x="26" y="302" fill="#5d6678">1 kHz Franka</text>
+        <text x="26" y="320" fill="#5d6678">10 ms step in sim</text>
+      </g>
+      <!-- lane 1 -->
+      <rect x="215" y="34" width="220" height="64" rx="10" fill="#fff" stroke="#1f9d6b"/>
+      <text x="325" y="60" text-anchor="middle" font-weight="600" font-size="13.5">camera thread</text>
+      <text x="325" y="82" text-anchor="middle" font-size="12" class="mono">RealSense / CameraSim</text>
+      <rect x="480" y="34" width="250" height="64" rx="10" fill="#fff" stroke="#1f9d6b"/>
+      <text x="605" y="56" text-anchor="middle" font-weight="600" font-size="13.5">detector → pose</text>
+      <text x="605" y="76" text-anchor="middle" font-size="12" class="mono">ArucoThread · sense_HsvBlob</text>
+      <text x="605" y="92" text-anchor="middle" font-size="12" class="mono">OptiTrack (pulled in sync)</text>
+      <rect x="775" y="34" width="240" height="64" rx="10" fill="#efe9fb" stroke="#7a4fd0"/>
+      <text x="895" y="60" text-anchor="middle" font-weight="600" font-size="13.5" fill="#7a4fd0">object frames in C</text>
+      <text x="895" y="82" text-anchor="middle" font-size="12" class="mono">C["target"]-&gt;setPosition(p)</text>
+      <path d="M437,66 H476" stroke="#1f9d6b" stroke-width="2" marker-end="url(#arG)"/>
+      <path d="M732,66 H771" stroke="#1f9d6b" stroke-width="2" marker-end="url(#arG)"/>
+      <!-- lane 2 -->
+      <rect x="215" y="149" width="220" height="64" rx="10" fill="#fff" stroke="#7a4fd0"/>
+      <text x="325" y="175" text-anchor="middle" font-weight="600" font-size="13.5">bot.sync(C, dt)</text>
+      <text x="325" y="197" text-anchor="middle" font-size="12" fill="#5d6678">robot q + newest objects</text>
+      <rect x="480" y="149" width="250" height="64" rx="10" fill="#fff" stroke="#7a4fd0"/>
+      <text x="605" y="171" text-anchor="middle" font-weight="600" font-size="13.5">re-solve on current C</text>
+      <text x="605" y="191" text-anchor="middle" font-size="12" class="mono">IK (1-step KOMO)</text>
+      <text x="605" y="207" text-anchor="middle" font-size="12" class="mono">ShortPathMPC · SecMPC</text>
+      <rect x="775" y="149" width="240" height="64" rx="10" fill="#fff" stroke="#2f6fde" stroke-width="2"/>
+      <text x="895" y="171" text-anchor="middle" font-weight="600" font-size="13.5" fill="#2f6fde">send, overwriting</text>
+      <text x="895" y="191" text-anchor="middle" font-size="12" class="mono">moveTo(q, c, true)</text>
+      <text x="895" y="207" text-anchor="middle" font-size="12" class="mono">move(.., true, t) · stepAction</text>
+      <path d="M437,181 H476" stroke="#7a4fd0" stroke-width="2" marker-end="url(#arP)"/>
+      <path d="M732,181 H771" stroke="#7a4fd0" stroke-width="2" marker-end="url(#arP)"/>
+      <path d="M895,100 C895,125 330,120 325,145" stroke="#7a4fd0" stroke-width="2" fill="none" stroke-dasharray="6 4" marker-end="url(#arP)"/>
+      <text x="770" y="131" text-anchor="end" font-size="12" fill="#7a4fd0">read at the next sync</text>
+      <!-- lane 3 -->
+      <rect x="775" y="264" width="240" height="64" rx="10" fill="#fff" stroke="#e07b16"/>
+      <text x="895" y="290" text-anchor="middle" font-weight="600" font-size="13.5">spline reference</text>
+      <text x="895" y="312" text-anchor="middle" font-size="12" fill="#5d6678">smooth takeover from now</text>
+      <rect x="480" y="264" width="250" height="64" rx="10" fill="#fff" stroke="#e07b16"/>
+      <text x="605" y="290" text-anchor="middle" font-weight="600" font-size="13.5">tracking controller</text>
+      <text x="605" y="312" text-anchor="middle" font-size="12" fill="#5d6678">PD + gravity comp. / PhysX</text>
+      <rect x="215" y="264" width="220" height="64" rx="10" fill="#fff" stroke="#e07b16"/>
+      <text x="325" y="290" text-anchor="middle" font-weight="600" font-size="13.5">state</text>
+      <text x="325" y="312" text-anchor="middle" font-size="12" class="mono">q, qDot, ctrlTime</text>
+      <path d="M895,215 V260" stroke="#2f6fde" stroke-width="2.5" marker-end="url(#arB)"/>
+      <path d="M773,296 H734" stroke="#e07b16" stroke-width="2" marker-end="url(#arO)"/>
+      <path d="M478,296 H439" stroke="#e07b16" stroke-width="2" marker-end="url(#arO)"/>
+      <path d="M325,262 V217" stroke="#1f9d6b" stroke-width="2.5" marker-end="url(#arG)"/>
+      <text x="520" y="368" text-anchor="middle" font-size="13" fill="#5d6678">Each loop runs at its own rate: a slow camera never blocks the 1 kHz controller, and a new command replaces the old spline without a jerk.</text>
+    </svg>
+  </div>
+
+  <div class="grid g3" style="margin-top:16px">
+    <div class="card" style="margin:0">
+      <h3>A · Reactive target</h3>
+      <p class="muted" style="margin:4px 0 10px">Each cycle: perceive the target, solve a small IK, steer there. The simplest form of visual servoing.</p>
+      <code>bot.moveTo(q, timeCost, true)</code>
+      <p class="muted" style="margin:10px 0 0;font-size:14px">The timing is re-optimized from the current reference every call. Higher <code>timeCost</code> means more aggressive.</p>
+    </div>
+    <div class="card" style="margin:0">
+      <h3>B · Step control</h3>
+      <p class="muted" style="margin:4px 0 10px">An RL-style interface: observe, then apply a joint-space delta with a time constant <code>lambda</code>.</p>
+      <code>obs = bot.stepObservation()</code><br>
+      <code>bot.stepAction(delta, obs, lambda)</code>
+      <p class="muted" style="margin:10px 0 0;font-size:14px">Writes a constant-acceleration spline piece (acceleration clipped by <code>maxAccel</code>). Example: <code>05-moveTo</code>, <code>test_reactive_control</code>.</p>
+    </div>
+    <div class="card" style="margin:0">
+      <h3>C · Model-predictive control</h3>
+      <p class="muted" style="margin:4px 0 10px">Re-plan a short path (and its timing) every cycle and overwrite the future part of the spline.</p>
+      <code>bot.move(path, times, true, ctrlTime)</code>
+      <p class="muted" style="margin:10px 0 0;font-size:14px"><code>07-leapCtrl</code> (ShortPathMPC + timing optimization); <code>13-reactiveGrasp</code> with <code>skills/control/SecMPC_Stepper</code> for whole multi-phase tasks.</p>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div class="card" style="margin:0">
+      <h3>Sketch: camera-driven reaching (Python, runs in simulation with a stand-in <code>detect</code>)</h3>
+<pre style="margin-top:8px"><span class="k">import</span> robotic <span class="k">as</span> ry
+
+C = ry.Config()
+C.addFile(ry.raiPath(<span class="s">'../rai-robotModels/scenarios/pandaSingle.g'</span>))
+target = C.addFrame(<span class="s">'target'</span>).setShape(ry.ST.marker, [.1])
+bot = ry.BotOp(C, useRealRobot=<span class="k">False</span>)
+
+<span class="k">def</span> <span class="f">ik</span>(C):                                  <span class="c"># 1-step KOMO: gripper at target</span>
+    komo = ry.KOMO(C, 1, 1, 0, <span class="k">False</span>)
+    komo.addObjective([], ry.FS.jointState, [], ry.OT.sos, [1e-1], C.getJointState())
+    komo.addObjective([], ry.FS.positionDiff, [<span class="s">'l_gripper'</span>, <span class="s">'target'</span>], ry.OT.eq, [1e1])
+    ret = ry.NLP_Solver(komo.nlp(), verbose=0).solve()
+    <span class="k">return</span> komo.getPath()[0] <span class="k">if</span> ret.feasible <span class="k">else</span> <span class="k">None</span>
+
+<span class="k">while</span> bot.getKeyPressed() != ord(<span class="s">'q'</span>):
+    bot.<span class="f">sync</span>(C, .05)                            <span class="c"># 20 Hz: C &lt;- robot state</span>
+    rgb, depth, pts = bot.<span class="f">getImageDepthPcl</span>(<span class="s">'cameraWrist'</span>, globalCoordinates=<span class="k">True</span>)
+    p = <span class="f">detect</span>(rgb, pts)                         <span class="c"># your vision: pixel -&gt; 3D point</span>
+    <span class="k">if</span> p <span class="k">is None</span>: <span class="k">continue</span>
+    target.setPosition(p)
+    q = <span class="f">ik</span>(C)
+    <span class="k">if</span> q <span class="k">is not None</span>:
+        bot.<span class="f">moveTo</span>(q, timeCost=5., overwrite=<span class="k">True</span>)</pre>
+      <p class="muted" style="margin:10px 0 0;font-size:14px"><code>detect</code> is yours (color blob, ArUco, a network …). In C++, <code>skills/perception/sense_HsvBlob</code> does the detect-and-set-frame step for a colored blob.</p>
+    </div>
+    <div class="card" style="margin:0">
+      <h3>Building blocks in this repo</h3>
+      <table>
+        <tr><th>block</th><th>where</th></tr>
+        <tr><td>camera images, depth, point cloud (sim or RealSense)</td><td><code>getImageAndDepth</code>, <code>getImageDepthPcl</code></td></tr>
+        <tr><td>ArUco detection per camera, fused over cameras</td><td><code>launch_arucos</code>, <code>ArucoSystemThread</code> (<code>15-arucoSystem</code>)</td></tr>
+        <tr><td>colored blob → 3D frame in C</td><td><code>skills/perception/senseHsvBlob</code></td></tr>
+        <tr><td>motion capture → frames in C</td><td><code>-bot/useOptitrack true</code>, updated in every <code>sync</code></td></tr>
+        <tr><td>fixed-rate control cycle</td><td><code>bot.sync(C, dt)</code> or <code>SecMPC_Stepper</code> (metronome)</td></tr>
+        <tr><td>contact-safe execution</td><td><code>setCompliance(J, c)</code> (<code>10-compliant</code>)</td></tr>
+      </table>
+      <h3 style="margin-top:16px">Things to keep in mind</h3>
+      <ul class="muted" style="margin:6px 0 0;padding-left:20px;font-size:14.5px">
+        <li>An overwriting spline must start near the current reference. <code>moveTo</code> and <code>stepAction</code> handle this; for <code>move</code>, pass <code>bot.get_t()</code> and drop waypoints that are already in the past (as <code>07-leapCtrl</code> does).</li>
+        <li>Images are older than the robot state. For fast targets, use the camera pose of <code>C</code> at capture time, or predict.</li>
+        <li>Rendering simulated cameras is slow, so read images every few cycles, as <code>20-simulation</code> does.</li>
+        <li><code>13-reactiveGrasp</code> closes the loop on OptiTrack (or a simulated moving ball). For a camera-based loop, combine a detector from <code>15</code>/<code>senseHsvBlob</code> with pattern A, B or C.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ DRIVERS -->
+<section id="drivers">
+  <h2>How BotOp picks the hardware<small>No configuration code: the frame names in your model decide which drivers start.</small></h2>
+  <div class="card">
+    <svg viewBox="0 0 1040 300" role="img" aria-label="driver registry">
+      <rect x="20" y="20" width="300" height="260" rx="14" fill="#efe9fb" stroke="#7a4fd0"/>
+      <text x="170" y="48" text-anchor="middle" font-weight="700" fill="#7a4fd0" font-size="15">model file (.g)</text>
+      <g class="mono" font-size="13">
+        <text x="45" y="85">l_panda_base</text>
+        <text x="45" y="125">r_panda_base</text>
+        <text x="45" y="165">l_robotiq_base</text>
+        <text x="45" y="205">l_panda_finger_joint1</text>
+        <text x="45" y="245">omnibase_world</text>
+      </g>
+      <rect x="390" y="90" width="260" height="120" rx="14" fill="#e6eefc" stroke="#2f6fde" stroke-width="2"/>
+      <text x="520" y="122" text-anchor="middle" font-weight="700" fill="#2f6fde" font-size="15">driver registry</text>
+      <text x="520" y="148" text-anchor="middle" font-size="12.5" class="mono">src/BotOp/drivers.h</text>
+      <text x="520" y="172" text-anchor="middle" font-size="12.5" fill="#5d6678">each driver registers its</text>
+      <text x="520" y="190" text-anchor="middle" font-size="12.5" fill="#5d6678">frame name in its own .cpp</text>
+      <rect x="720" y="20" width="300" height="260" rx="14" fill="#fdf0e2" stroke="#e07b16"/>
+      <text x="870" y="48" text-anchor="middle" font-weight="700" fill="#e07b16" font-size="15">started threads</text>
+      <g font-size="13.5">
+        <text x="745" y="85">FrankaThread → robotL</text>
+        <text x="745" y="125">FrankaThread → robotR</text>
+        <text x="745" y="165">RobotiqGripper → gripperL</text>
+        <text x="745" y="205">FrankaGripper → gripperL</text>
+        <text x="745" y="245">OmnibaseThread → free slot</text>
+      </g>
+      <g stroke="#9aa3b5" stroke-width="1.5" fill="none">
+        <path d="M230,80 C330,80 330,130 386,135"/><path d="M230,120 C320,120 340,140 386,145"/>
+        <path d="M230,160 C320,160 340,155 386,155"/><path d="M250,200 C330,200 340,165 386,165"/>
+        <path d="M230,240 C330,240 340,180 386,180"/>
+        <path d="M654,135 C690,135 690,80 740,80"/><path d="M654,145 C695,145 695,120 740,120"/>
+        <path d="M654,155 C700,155 700,160 740,160"/><path d="M654,165 C700,165 700,200 740,200"/>
+        <path d="M654,180 C690,180 690,240 740,240"/>
+      </g>
+    </svg>
+    <p class="muted" style="margin:6px 0 0;font-size:14.5px">To add a robot: put its model in <code>rai-robotModels</code>, test it in simulation (no driver needed),
+      then write a driver in <code>src/&lt;MyArm&gt;/</code> and register its base frame name. <code>bot.cpp</code>, Python and the <code>bot</code> tool need no change.
+      Step-by-step guide: README section “Adding a new robot arm or hand”.</p>
+  </div>
+</section>
+
+<!-- ============================================================ REPO MAP -->
+<section id="repo">
+  <h2>Repository map<small>Click a folder.</small></h2>
+  <div class="card map">
+    <div class="tree" id="tree">
+      <div data-k="root">botop/</div>
+      <div class="i1" data-k="botop">src/BotOp/</div>
+      <div class="i1" data-k="sim">src/Sim/</div>
+      <div class="i1" data-k="drivers">src/Franka, Robotiq, …</div>
+      <div class="i1" data-k="skills">skills/</div>
+      <div class="i1" data-k="bin">bin/bot/</div>
+      <div class="i1" data-k="python">python/robotic/</div>
+      <div class="i1" data-k="examples">test/examples/</div>
+      <div class="i1" data-k="py">test/py/</div>
+      <div class="i1" data-k="rai">rai/ (submodule)</div>
+      <div class="i1" data-k="models">rai-robotModels/ (submodule)</div>
+      <div class="i1" data-k="pixi">pixi.toml, CMakeLists.txt</div>
+      <div class="i1" data-k="scripts">scripts/build_deps.sh</div>
+      <div class="i1" data-k="docs">docs/</div>
+    </div>
+    <div class="detail" id="detail"></div>
+  </div>
+  <div class="card">
+    <h3>How the pieces stack</h3>
+    <svg viewBox="0 0 1040 250" role="img" aria-label="layers">
+      <rect x="20" y="10" width="1000" height="44" rx="10" fill="#f4f5f8" stroke="#d9dee7"/>
+      <text x="520" y="38" text-anchor="middle" font-size="14"><tspan font-weight="700">your scripts</tspan> · bin/bot · test/examples · test/py · notebooks</text>
+      <rect x="20" y="64" width="490" height="44" rx="10" fill="#e6eefc" stroke="#2f6fde"/>
+      <text x="265" y="92" text-anchor="middle" font-size="14"><tspan font-weight="700">libbotop</tspan>  BotOp, Sim, drivers, Python binding</text>
+      <rect x="530" y="64" width="490" height="44" rx="10" fill="#e6eefc" stroke="#2f6fde" stroke-dasharray="5 4"/>
+      <text x="775" y="92" text-anchor="middle" font-size="14"><tspan font-weight="700">libbotop_skills</tspan>  Move_IK, SecMPC_Stepper, HSV blob (optional)</text>
+      <rect x="20" y="118" width="1000" height="44" rx="10" fill="#efe9fb" stroke="#7a4fd0"/>
+      <text x="520" y="146" text-anchor="middle" font-size="14"><tspan font-weight="700">librai</tspan>  kinematics · KOMO · optimization · control (splines, timing) · PhysX sim · perception · GL viewer</text>
+      <rect x="20" y="172" width="1000" height="44" rx="10" fill="#fdf0e2" stroke="#e07b16"/>
+      <text x="520" y="200" text-anchor="middle" font-size="14"><tspan font-weight="700">third-party</tspan>  Eigen, FCL, qhull, PhysX, GLFW, pybind11 … (+ libfranka, librealsense in hw), all from pixi</text>
+      <text x="520" y="240" text-anchor="middle" font-size="13" fill="#5d6678">robot and scene models (rai-robotModels) are data, loaded at runtime into rai::Configuration</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ============================================================ BUILD -->
+<section id="build">
+  <h2>Build: two pixi environments<small>Everything (compilers, libraries, Python) lives in <code>.pixi/</code>; nothing goes into the system.</small></h2>
+  <div class="card">
+    <svg viewBox="0 0 1040 260" role="img" aria-label="pixi environments">
+      <rect x="20" y="20" width="250" height="210" rx="14" fill="#f4f5f8" stroke="#d9dee7"/>
+      <text x="145" y="50" text-anchor="middle" font-weight="700" font-size="15">pixi.toml + pixi.lock</text>
+      <text x="145" y="80" text-anchor="middle" font-size="13" fill="#5d6678">pinned conda-forge deps</text>
+      <rect x="45" y="100" width="200" height="50" rx="9" fill="#fff" stroke="#d9dee7"/>
+      <text x="145" y="122" text-anchor="middle" font-size="13" class="mono">pixi run deps</text>
+      <text x="145" y="140" text-anchor="middle" font-size="12" fill="#5d6678">fcl 0.5, qhull, PhysX from source</text>
+      <rect x="45" y="160" width="200" height="50" rx="9" fill="#fff" stroke="#d9dee7"/>
+      <text x="145" y="182" text-anchor="middle" font-size="13" class="mono">pixi run install-all</text>
+      <text x="145" y="200" text-anchor="middle" font-size="12" fill="#5d6678">build + install both envs</text>
+
+      <rect x="360" y="20" width="300" height="100" rx="14" fill="#e3f5ed" stroke="#1f9d6b" stroke-width="2"/>
+      <text x="510" y="50" text-anchor="middle" font-weight="700" fill="#1f9d6b" font-size="15">default  (simulation)</text>
+      <text x="510" y="76" text-anchor="middle" font-size="12.5" class="mono">build/default → .pixi/envs/default</text>
+      <text x="510" y="100" text-anchor="middle" font-size="12.5" class="mono">pixi run bot -sim -home</text>
+
+      <rect x="360" y="130" width="300" height="100" rx="14" fill="#fdf0e2" stroke="#e07b16" stroke-width="2"/>
+      <text x="510" y="160" text-anchor="middle" font-weight="700" fill="#e07b16" font-size="15">hw  (+ libfranka, librealsense)</text>
+      <text x="510" y="186" text-anchor="middle" font-size="12.5" class="mono">build/hw → .pixi/envs/hw</text>
+      <text x="510" y="210" text-anchor="middle" font-size="12.5" class="mono">pixi run -e hw bot -home</text>
+
+      <path d="M272,125 C320,125 310,70 356,70" stroke="#5d6678" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+      <path d="M272,135 C320,135 310,180 356,180" stroke="#5d6678" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+
+      <rect x="740" y="20" width="280" height="210" rx="14" fill="#fff" stroke="#d9dee7"/>
+      <text x="880" y="50" text-anchor="middle" font-weight="700" font-size="15">each env provides</text>
+      <g font-size="13.5">
+        <text x="765" y="84"><tspan class="mono">lib/</tspan> librai, libbotop</text>
+        <text x="765" y="112"><tspan class="mono">bin/</tspan> bot, kinEdit, meshTool</text>
+        <text x="765" y="140"><tspan class="mono">site-packages/</tspan> robotic</text>
+        <text x="765" y="168"><tspan class="mono">include/rai/</tspan> headers</text>
+        <text x="765" y="204" fill="#5d6678" font-size="12.5">both builds stay incremental and</text>
+        <text x="765" y="222" fill="#5d6678" font-size="12.5">never overwrite each other</text>
+      </g>
+      <path d="M662,70 C700,70 700,120 736,120" stroke="#5d6678" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+      <path d="M662,180 C700,180 700,130 736,130" stroke="#5d6678" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+    </svg>
+    <table style="margin-top:10px">
+      <tr><th>task</th><th>what it does</th></tr>
+      <tr><td><code>pixi run install-all</code></td><td>first-time setup: deps, then build and install <code>default</code> and <code>hw</code></td></tr>
+      <tr><td><code>pixi run build</code> / <code>install</code></td><td>(re)build the current environment; <code>-e hw</code> for hardware</td></tr>
+      <tr><td><code>pixi run test-py</code></td><td>Python smoke test in simulation</td></tr>
+      <tr><td><code>pixi run notebooks</code></td><td>execute <code>test/py/*.ipynb</code></td></tr>
+      <tr><td><code>pixi run stubs</code> · <code>clean</code></td><td>Python type stubs · remove <code>build/</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ QUICK START -->
+<section id="start">
+  <h2>Quick start<small>Same program in C++ and Python. Flip one flag to run on the real robot.</small></h2>
+  <div class="card">
+    <pre style="margin-bottom:16px"><span class="c"># once</span>
+git clone --recurse-submodules git@github.com:marcomeng1/botop.git &amp;&amp; cd botop
+pixi run install-all
+pixi run bot -help            <span class="c"># the bot tool: home, open/close gripper, float, ...</span>
+pixi run bot -sim -loop       <span class="c"># first check: the simulated arm moves back and forth</span></pre>
+    <div class="tabs" id="codeTabs">
+      <button data-t="py" class="on">Python</button>
+      <button data-t="cpp">C++</button>
+    </div>
+<pre id="code-py"><span class="k">import</span> robotic <span class="k">as</span> ry
+
+C = ry.Config()
+C.addFile(ry.raiPath(<span class="s">'../rai-robotModels/scenarios/pandaSingle.g'</span>))
+
+bot = ry.BotOp(C, useRealRobot=<span class="k">False</span>)     <span class="c"># True on the robot (pixi run -e hw ...)</span>
+
+q = bot.get_qHome()
+q[1] -= .5
+bot.<span class="f">moveTo</span>(q, timeCost=<span class="s">1.</span>)                 <span class="c"># returns immediately</span>
+bot.<span class="f">wait</span>(C, forKeyPressed=<span class="k">False</span>, forTimeToEnd=<span class="k">True</span>)   <span class="c"># sync C + viewer until done</span>
+
+bot.<span class="f">gripperClose</span>(ry._left)
+bot.<span class="f">wait</span>(C, forKeyPressed=<span class="k">False</span>, forTimeToEnd=<span class="k">False</span>, forGripper=<span class="k">True</span>)
+
+bot.<span class="f">home</span>(C)
+<span class="k">del</span> bot</pre>
+<pre id="code-cpp" class="hidden"><span class="k">#include</span> <span class="s">&lt;BotOp/bot.h&gt;</span>
+
+<span class="k">int</span> main(<span class="k">int</span> argc, <span class="k">char</span>** argv){
+  rai::initCmdLine(argc, argv);
+
+  rai::Configuration C;
+  C.addFile(rai::raiPath(<span class="s">"../rai-robotModels/scenarios/pandaSingle.g"</span>));
+
+  BotOp bot(C, rai::getParameter&lt;<span class="k">bool</span>&gt;(<span class="s">"real"</span>, <span class="k">false</span>));   <span class="c">// -real true on the robot</span>
+
+  arr q = bot.qHome;
+  q(1) -= .5;
+  bot.<span class="f">moveTo</span>(q, 1.);                      <span class="c">// returns immediately</span>
+  bot.<span class="f">wait</span>(C, <span class="k">false</span>, <span class="k">true</span>);                 <span class="c">// sync C + viewer until done</span>
+
+  bot.<span class="f">gripperClose</span>(rai::_left);
+  bot.<span class="f">wait</span>(C, <span class="k">false</span>, <span class="k">false</span>, <span class="k">true</span>);
+
+  bot.<span class="f">home</span>(C);
+  <span class="k">return</span> 0;
+}</pre>
+    <p class="muted" style="font-size:14.5px;margin:12px 0 0">The real-robot run needs the <code>hw</code> environment plus a one-time OS setup (real-time kernel, udev rules, network to the arm):
+      see the README section “Run on hardware”. Press <span class="kbd">q</span> in the viewer to leave a <code>wait</code>.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EXAMPLES -->
+<section id="examples">
+  <h2>Examples, as a learning path<small>From <code>test/examples/</code>; full table in its README. Filter:</small></h2>
+  <div class="toggle" id="exToggle" style="margin-top:8px">
+    <button data-f="all" class="on">all</button>
+    <button data-f="sim">runs in simulation</button>
+    <button data-f="hw">needs hardware</button>
+  </div>
+  <div class="card">
+    <table id="exTable">
+      <tr><th>stage</th><th>example</th><th>what you learn</th><th></th></tr>
+      <tr data-f="sim"><td>1 basics</td><td><code>05-moveTo</code></td><td>first motion commands: <code>move</code>, <code>moveTo</code>, <code>stepObservation</code>/<code>stepAction</code></td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>1 basics</td><td><code>01-openClose</code></td><td>gripper open/close through BotOp</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>1 basics</td><td><code>21-grasp</code></td><td>smallest grasp: KOMO approach + gripper</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>2 planning</td><td><code>06-fastPath</code></td><td>execute a KOMO path at increasing speeds</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>2 planning</td><td><code>09-rndPoses</code></td><td>random collision-free poses with <code>moveAutoTimed</code></td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>2 planning</td><td><code>08-pnp</code></td><td>pick-and-place in phases, attach objects in C</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>3 reactive</td><td><code>07-leapCtrl</code></td><td>receding-horizon KOMO following a jumping target (<code>overwrite</code>)</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>3 reactive</td><td><code>13-reactiveGrasp</code></td><td>sequence-of-constraints MPC: pick-and-place, pushing, drone race</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>3 reactive</td><td><code>10-compliant</code></td><td>task-space compliance with <code>setCompliance</code></td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>4 perception</td><td><code>15-arucoSystem</code></td><td>fuse ArUco detections from 4 cameras into an object pose</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="sim"><td>4 perception</td><td><code>20-simulation</code></td><td>plain PhysX simulation without BotOp: push, grasp, stack</td><td><span class="tag t-sim">sim</span></td></tr>
+      <tr data-f="hw"><td>4 perception</td><td><code>02-camera</code>, <code>02-multi-camera</code></td><td>RGB, depth and point clouds from RealSense</td><td><span class="tag t-hw">RealSense</span></td></tr>
+      <tr data-f="hw"><td>4 perception</td><td><code>02-optitrack</code>, <code>03-blobTracking</code></td><td>mocap streaming; ArUco and color-blob tracking</td><td><span class="tag t-hw">OptiTrack / camera</span></td></tr>
+      <tr data-f="hw"><td>5 lab setup</td><td><code>11-calibStation</code>, <code>14-calibPoints</code></td><td>calibrate OptiTrack, robot bases and the wrist camera</td><td><span class="tag t-hw">OptiTrack / RealSense</span></td></tr>
+      <tr data-f="hw"><td>5 lab setup</td><td><code>04-trivialCtrl</code>, <code>12-controlCalib</code></td><td>raw <code>FrankaThread</code> and controller gain tuning</td><td><span class="tag t-hw">Franka</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Where to go next</h2>
+  <div class="grid g3">
+    <div class="card" style="margin:0"><h3><a href="../README.md">README.md</a></h3><span class="muted">installation, hardware setup, adding a robot, layout</span></div>
+    <div class="card" style="margin:0"><h3><a href="howto.md">docs/howto.md</a></h3><span class="muted">motion commands in detail, main loop, OptiTrack calibration, cfg parameters</span></div>
+    <div class="card" style="margin:0"><h3><a href="../test/examples/README.md">test/examples/README.md</a></h3><span class="muted">build and run the C++ examples</span></div>
+    <div class="card" style="margin:0"><h3><a href="https://marctoussaint.github.io/robotic/">robotic docs</a></h3><span class="muted">the Python package: Config, KOMO, BotOp tutorials</span></div>
+    <div class="card" style="margin:0"><h3><a href="https://github.com/marcomeng1/rai/tree/pixi-cleanup">rai</a></h3><span class="muted">the core library underneath (kinematics, KOMO, control)</span></div>
+    <div class="card" style="margin:0"><h3><a href="https://github.com/MarcToussaint/botop">upstream BotOp</a></h3><span class="muted">MarcToussaint/botop, the project this fork is based on</span></div>
+  </div>
+</section>
+
+</main>
+
+<footer>BotOp · illustrated overview · this file is self-contained (no external scripts), open it directly in a browser.</footer>
+
+<script>
+  // sim / real toggle
+  const setMode = m => {
+    document.querySelectorAll('#modeToggle button').forEach(b => b.classList.toggle('on', b.dataset.mode===m));
+    const sim = m!=='real', real = m!=='sim';
+    ['layerSim','aSim'].forEach(id => document.getElementById(id).classList.toggle('dim', !sim));
+    ['layerReal','aReal'].forEach(id => document.getElementById(id).classList.toggle('dim', !real));
+  };
+  document.querySelectorAll('#modeToggle button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+  // append / overwrite
+  document.querySelectorAll('#ovToggle button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#ovToggle button').forEach(x => x.classList.toggle('on', x===b));
+    const ov = b.dataset.ov==='overwrite';
+    document.getElementById('oldRest').classList.toggle('hidden', ov);
+    document.getElementById('newAppend').classList.toggle('hidden', ov);
+    document.getElementById('oldRestDim').classList.toggle('hidden', !ov);
+    document.getElementById('newOver').classList.toggle('hidden', !ov);
+  });
+
+  // code tabs
+  document.querySelectorAll('#codeTabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#codeTabs button').forEach(x => x.classList.toggle('on', x===b));
+    document.getElementById('code-py').classList.toggle('hidden', b.dataset.t!=='py');
+    document.getElementById('code-cpp').classList.toggle('hidden', b.dataset.t!=='cpp');
+  });
+
+  // examples filter
+  document.querySelectorAll('#exToggle button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#exToggle button').forEach(x => x.classList.toggle('on', x===b));
+    document.querySelectorAll('#exTable tr[data-f]').forEach(r =>
+      r.style.display = (b.dataset.f==='all' || r.dataset.f===b.dataset.f) ? '' : 'none');
+  });
+
+  // repo map
+  const info = {
+    root: ['botop/', 'The robot operation layer. Small on purpose: the heavy lifting (kinematics, optimization, simulation) is in the <code>rai</code> submodule; botop adds the robot interface, drivers and tools.'],
+    botop: ['src/BotOp/', 'The <code>BotOp</code> class (<code>bot.h</code>, <code>bot.cpp</code>), the driver registry (<code>drivers.h</code>) and the Python binding (<code>py-BotOp.cxx</code>). Built into <code>libbotop</code>. Start reading here.'],
+    sim: ['src/Sim/', '<code>BotThreadedSim</code>: runs <code>rai::Simulation</code> (PhysX) in a thread at <code>botsim/tau</code> = 10 ms and pretends to be a robot. Also <code>GripperSim</code> and <code>CameraSimThread</code>. Used whenever <code>useRealRobot=false</code>.'],
+    drivers: ['src/&lt;driver&gt;/', '<b>Franka</b> (arm + hand, libfranka, 1 kHz), <b>Robotiq</b> (gripper over USB serial), <b>Omnibase</b> (mobile base), <b>RealSense</b> (cameras), <b>OptiTrack</b> (motion capture), <b>Audio</b>. Vendor code is wrapped in <code>#ifdef RAI_…</code>, so the simulation build compiles without the SDKs.'],
+    skills: ['skills/', 'Optional helpers on top of BotOp (<code>-DBUILD_SKILLS</code>, <code>libbotop_skills</code>): <code>motion/Move_IK</code>, <code>control/SecMPC_Stepper</code> (used by example 13), <code>perception/senseHsvBlob</code>.'],
+    bin: ['bin/bot/', 'The <code>bot</code> command-line tool for daily lab use: <code>-home</code>, <code>-up</code>, <code>-open</code>, <code>-close</code>, <code>-float</code> (guide by hand), <code>-damp</code>, <code>-hold</code>, <code>-loop</code>. Add <code>-sim</code> to try it in simulation; <code>bot -help</code> lists everything. Also the shortest complete BotOp program.'],
+    python: ['python/robotic/', 'The Python package <code>robotic</code> (<code>import robotic as ry</code>): a thin <code>__init__.py</code> around the compiled <code>_robotic</code> module that contains rai and BotOp. Installed into the pixi environment by <code>pixi run install</code>.'],
+    examples: ['test/examples/', '19 small C++ programs, from first motions to MPC, perception and calibration. Build with <code>-DBUILD_TESTS=ON</code>; run from each folder (they read the local <code>rai.cfg</code>). Overview in <code>test/examples/README.md</code>.'],
+    py: ['test/py/', '<code>test.py</code>: Python smoke test (<code>pixi run test-py</code>). <code>main.ipynb</code>: notebook walkthrough (<code>pixi run notebooks</code>).'],
+    rai: ['rai/ (submodule)', 'The core library: <code>Kin</code> (configurations, frames, features), <code>KOMO</code> (motion optimization), <code>Optim</code>, <code>Control</code> (splines, timing optimization, MPC), <code>Kin/simulation</code> (PhysX), <code>Perception</code>, <code>Gui</code>. Built into <code>librai</code>.'],
+    models: ['rai-robotModels/ (submodule)', 'Robot and scene models as <code>.g</code> files plus meshes: <code>panda/</code>, <code>robotiq/</code>, … and ready scenarios like <code>scenarios/pandaSingle.g</code> (default for <code>bot</code>) and <code>scenarios/pandasTable-calibrated.g</code> (two arms). View one with <code>pixi run kinEdit &lt;file&gt;.g</code>.'],
+    pixi: ['pixi.toml, CMakeLists.txt', '<code>pixi.toml</code> declares all dependencies (conda-forge) and the tasks; environments <code>default</code> and <code>hw</code>. <code>CMakeLists.txt</code> builds <code>librai</code>, <code>libbotop</code>, the Python module, the tools and (optionally) the examples, and installs into <code>$CONDA_PREFIX</code>.'],
+    scripts: ['scripts/build_deps.sh', 'Source builds of the dependencies that conda-forge does not provide in the right version: fcl 0.5, non-reentrant qhull, PhysX 104.1. Run by <code>pixi run deps</code>.'],
+    docs: ['docs/', 'This page (<code>index.html</code>) and <code>howto.md</code>: motion commands in detail, main-loop patterns, OptiTrack calibration, cfg parameters.'],
+  };
+  const tree = document.getElementById('tree'), detail = document.getElementById('detail');
+  const show = k => {
+    tree.querySelectorAll('div').forEach(d => d.classList.toggle('on', d.dataset.k===k));
+    detail.innerHTML = '<h3><code>'+info[k][0]+'</code></h3><div>'+info[k][1]+'</div>';
+  };
+  tree.querySelectorAll('div').forEach(d => d.onclick = () => show(d.dataset.k));
+  show('botop');
+</script>
+</body>
+</html>

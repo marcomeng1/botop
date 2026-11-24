@@ -200,6 +200,9 @@ Build from within `pixi shell` so the same compiler and libraries are used.
 
 ## Documentation and related repos
 
+* [Illustrated introduction](https://marcomeng1.github.io/botop/)
+  (architecture, motion commands, closed-loop control, drivers, repo map);
+  source `docs/index.html`, published by `.github/workflows/pages.yml`
 * [docs/howto.md](docs/howto.md): how to command motion with BotOp, examples
 * [rai](https://github.com/marcomeng1/rai/tree/pixi-cleanup): core code base
   (upstream: [MarcToussaint/rai](https://github.com/MarcToussaint/rai))

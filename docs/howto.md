@@ -2,11 +2,9 @@
 
 ##  Examples
 
-* All examples/tests referenced below live in `test/examples/`.
-
-* Note: with the current rai, the tests 02-multi-camera, 04, 05, 06, 07, 08, 09, 11, 13, 14, 20
-  and 21 no longer compile (old rai API, e.g. `getLimits`, `JT_rigid`) and need updating. Build
-  them with `-DBUILD_TESTS=ON` to check.
+* All examples/tests referenced below live in `test/examples/` (overview and build
+  instructions in [test/examples/README.md](../test/examples/README.md)). For an illustrated
+  introduction to the repo, open [index.html](index.html) in a browser.
 
 * The tests 01, 03, and 04 are *not* examples for using BotOp
   (instead, they helped developing and testing underlying things). Ignore them.
